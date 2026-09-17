@@ -1,8 +1,8 @@
-# ── Hemligheter och lokal konfiguration ──────────────────────────────
-# Inget av detta ska någonsin nå ett publikt repo.
+# ── Secrets and local configuration ──────────────────────────────────
+# None of this may ever reach a public repository.
 .env
 .env.*
-!.env.example
+!env.example
 *.env
 secrets.*
 secrets/
@@ -10,7 +10,7 @@ credentials.*
 config.local.*
 *.local.json
 
-# Nycklar och certifikat
+# Keys and certificates
 *.pem
 *.key
 *.p12
@@ -24,7 +24,7 @@ id_ed25519*
 *.gpg
 *.asc
 
-# Moln- och verktygsautentisering
+# Cloud and tooling authentication
 .netrc
 .npmrc
 .yarnrc
@@ -33,78 +33,70 @@ id_ed25519*
 .gcloud/
 .azure/
 .ssh/
+.vercel
 *.tfvars
 *.tfstate
 *.tfstate.*
 .terraform/
 
-# Agent- och editorkonfiguration som kan innehålla lokala sökvägar
+# Supabase CLI local state (contains local database credentials)
+supabase/.branches/
+supabase/.temp/
+supabase/config.toml
+
+# Agent and editor configuration that can carry local paths
 .claude/
 .cursor/
 .aider*
 .mcp.json
 
-# ── Beroenden och byggen ─────────────────────────────────────────────
+# ── Dependencies and build output ────────────────────────────────────
 node_modules/
-bower_components/
-vendor/
-dist/
-build/
-out/
-.cache/
-.parcel-cache/
+.pnp
+.pnp.*
 .next/
-.nuxt/
-.svelte-kit/
+out/
+build/
+dist/
+.turbo/
+.swc/
 coverage/
 *.tsbuildinfo
+next-env.d.ts
 
-# ── Python (om något skript tillkommer) ──────────────────────────────
-__pycache__/
-*.py[cod]
-.venv/
-venv/
-env/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# ── Loggar och temporära filer ───────────────────────────────────────
+# ── Logs and temporary files ─────────────────────────────────────────
 *.log
 npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+.pnpm-debug.log*
 *.pid
-*.seed
 *.tmp
 *.temp
 *.bak
 *.swp
-*.swo
 *~
-.tmp/
 tmp/
 scratch/
 scratchpad/
 
-# ── Databasdumpar och exporter (kan innehålla riktiga spelardata) ────
+# ── Data exports (may contain real player data) ──────────────────────
 *.sqlite
 *.sqlite3
 *.db
 *.dump
-*.sql
+*.sql.gz
 borsbraket-*.csv
 export/
 exports/
 
-# ── Operativsystem och editorer ──────────────────────────────────────
+# ── Operating system and editors ─────────────────────────────────────
 .DS_Store
-.DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
 Thumbs.db
+ehthumbs.db
 desktop.ini
 .idea/
 .vscode/

@@ -1,0 +1,196 @@
+rules_version = '2';
+
+// ══════════════════════════════════════════════════════════════════════
+//  BörsBråket — Firestore security rules
+//
+//  This file is the entire access-control system. The web app ships its
+//  Firebase config to every visitor, which is fine: the config identifies
+//  the project and grants nothing. These rules run on Google's servers and
+//  decide what each signed-in account may actually read and write.
+//
+//  Deploy with:  firebase deploy --only firestore:rules
+// ══════════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Identity helpers ──────────────────────────────────────────────
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/profiles/$(request.auth.uid);
+    }
+
+    function hasProfile() {
+      return signedIn() && exists(profilePath());
+    }
+
+    function me() {
+      return get(profilePath()).data;
+    }
+
+    // An admin is also always treated as approved.
+    function isAdmin() {
+      return hasProfile() && me().isAdmin == true;
+    }
+
+    function isApproved() {
+      return hasProfile() && (me().status == 'approved' || me().isAdmin == true);
+    }
+
+    // ── Round helpers ─────────────────────────────────────────────────
+
+    function round(roundId) {
+      return get(/databases/$(database)/documents/rounds/$(roundId)).data;
+    }
+
+    function roundOpen(roundId) {
+      return round(roundId).status == 'open' && request.time < round(roundId).locksAt;
+    }
+
+    function roundLocked(roundId) {
+      return request.time >= round(roundId).locksAt || round(roundId).status != 'open';
+    }
+
+    // ── Instrument eligibility ────────────────────────────────────────
+    // A missing instrument makes get(...).data fail, which denies the
+    // write. That is the desired outcome: you cannot invent a ticker.
+
+    function instrumentOk(id) {
+      return get(/databases/$(database)/documents/instruments/$(id)).data.eligible == true
+          && get(/databases/$(database)/documents/instruments/$(id)).data.isBenchmark == false;
+    }
+
+    // Rules have no loops. Five picks is the hard ceiling, so the five
+    // slots are unrolled. Each id costs one document read; with the
+    // profile and round reads this stays inside the per-request budget.
+    function allInstrumentsOk(ids) {
+      return (ids.size() < 1 || instrumentOk(ids[0]))
+          && (ids.size() < 2 || instrumentOk(ids[1]))
+          && (ids.size() < 3 || instrumentOk(ids[2]))
+          && (ids.size() < 4 || instrumentOk(ids[3]))
+          && (ids.size() < 5 || instrumentOk(ids[4]));
+    }
+
+    // ── Players ───────────────────────────────────────────────────────
+
+    match /profiles/{uid} {
+      // You can always read your own row, including while pending, so the
+      // waiting-room page can explain itself. Approved players see the
+      // rest of the league.
+      allow read: if signedIn() && (request.auth.uid == uid || isApproved());
+
+      // Sign-up creates your own row, always pending and never admin.
+      allow create: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.uid == uid
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.isAdmin == false;
+
+      // Cosmetic self-edits only. Approval and admin rights cannot move.
+      allow update: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.status == resource.data.status
+                    && request.resource.data.isAdmin == resource.data.isAdmin
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.email == resource.data.email;
+
+      // Admins approve, reject and promote.
+      allow read, write: if isAdmin();
+    }
+
+    // ── Reference data ────────────────────────────────────────────────
+
+    match /markets/{code} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
+
+    match /instruments/{id} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
+
+    match /settings/{doc} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+    }
+
+    match /priceRuns/{id} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Rounds ────────────────────────────────────────────────────────
+
+    match /rounds/{roundId} {
+      allow read: if isApproved();
+      allow write: if isAdmin();
+
+      // ── Picks ───────────────────────────────────────────────────────
+      // Your own picks are yours to read at any time. Everyone else's
+      // become readable only once the round has locked — the rows are
+      // not sent to the browser before that, so the seal is real rather
+      // than a hidden div.
+      //
+      // A consequence worth knowing: listing every player's picks while a
+      // round is still open is refused outright, so the app reads only
+      // your own document until the lock passes.
+      match /picks/{uid} {
+        allow read: if isApproved()
+                    && (request.auth.uid == uid || roundLocked(roundId));
+
+        allow create, update: if signedIn()
+                    && request.auth.uid == uid
+                    && isApproved()
+                    && roundOpen(roundId)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.picks.keys().size() >= 1
+                    && request.resource.data.picks.keys().size() <= round(roundId).picksPerRound
+                    && request.resource.data.picks.keys().size() <= 5
+                    && allInstrumentsOk(request.resource.data.picks.keys());
+
+        allow delete: if signedIn() && request.auth.uid == uid && roundOpen(roundId);
+
+        allow read, write: if isAdmin();
+      }
+
+      // ── Submission markers ──────────────────────────────────────────
+      // Says THAT you have picked and how many, never WHAT. Lets the
+      // month page show who is still missing without leaking a single
+      // ticker before the lock.
+      match /submissions/{uid} {
+        allow read: if isApproved();
+
+        allow create, update: if signedIn()
+                    && request.auth.uid == uid
+                    && isApproved()
+                    && roundOpen(roundId)
+                    && request.resource.data.uid == uid
+                    && request.resource.data.count is int
+                    && request.resource.data.count >= 0
+                    && request.resource.data.count <= 5
+                    && request.resource.data.keys().hasOnly(['uid', 'count', 'submittedAt']);
+
+        allow delete: if signedIn() && request.auth.uid == uid && roundOpen(roundId);
+
+        allow read, write: if isAdmin();
+      }
+
+      // ── Weekly prices ───────────────────────────────────────────────
+      // Written by admins from the panel, or by the cron through the
+      // Admin SDK, which bypasses these rules by design.
+      match /prices/{instrumentId} {
+        allow read: if isApproved();
+        allow write: if isAdmin();
+      }
+    }
+
+    // Anything not named above is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
