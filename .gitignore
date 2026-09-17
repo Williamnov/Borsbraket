@@ -1,0 +1,112 @@
+# ── Hemligheter och lokal konfiguration ──────────────────────────────
+# Inget av detta ska någonsin nå ett publikt repo.
+.env
+.env.*
+!.env.example
+*.env
+secrets.*
+secrets/
+credentials.*
+config.local.*
+*.local.json
+
+# Nycklar och certifikat
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.crt
+*.cer
+id_rsa*
+id_ed25519*
+*.gpg
+*.asc
+
+# Moln- och verktygsautentisering
+.netrc
+.npmrc
+.yarnrc
+.pypirc
+.aws/
+.gcloud/
+.azure/
+.ssh/
+*.tfvars
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Agent- och editorkonfiguration som kan innehålla lokala sökvägar
+.claude/
+.cursor/
+.aider*
+.mcp.json
+
+# ── Beroenden och byggen ─────────────────────────────────────────────
+node_modules/
+bower_components/
+vendor/
+dist/
+build/
+out/
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.svelte-kit/
+coverage/
+*.tsbuildinfo
+
+# ── Python (om något skript tillkommer) ──────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Loggar och temporära filer ───────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.pid
+*.seed
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+.tmp/
+tmp/
+scratch/
+scratchpad/
+
+# ── Databasdumpar och exporter (kan innehålla riktiga spelardata) ────
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.sql
+borsbraket-*.csv
+export/
+exports/
+
+# ── Operativsystem och editorer ──────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+!.vscode/extensions.json
+*.sublime-workspace
