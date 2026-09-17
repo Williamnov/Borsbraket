@@ -22,6 +22,9 @@ anything.
 
 The full version lives at `/instructions` in the running app.
 
+Picking this up after a break? [STATUS.md](STATUS.md) has the current state, the next step, and the
+open decisions.
+
 ## Setting it up
 
 ### 1. Firebase
