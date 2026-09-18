@@ -3,8 +3,9 @@ import { adminDb } from "@/lib/firebase/admin";
 import { serverEnv } from "@/lib/env";
 import { getPriceProvider } from "@/lib/prices";
 import { checkpointDueDates, currentCheckpoint, isPricingOpen } from "@/lib/scoring";
+import { MARKET_MIC } from "@/lib/universe";
 import type { Round } from "@/lib/types";
-import type { PriceRequest } from "@/lib/prices/types";
+import type { PriceRequest, Quote } from "@/lib/prices/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,28 +13,43 @@ export const dynamic = "force-dynamic";
 const WEEK_FIELDS = ["w0", "w1", "w2", "w3", "w4"] as const;
 
 /**
- * Weekly price checkpoint. The schedule lives in vercel.json.
+ * The weekly price checkpoint.
  *
- * It runs daily rather than on Mondays, because what it records is tied
- * to the round's own clock and not to the week's. The baseline is the
- * price at the lock; a Monday-only job would record it on whichever
- * Monday came next, which is how the opening price used to drift by up
- * to six days and end up meaning something different from what the admin
- * grid meant by it. See checkpointDueDates in lib/scoring.ts.
+ * ── What decides what gets written ────────────────────────────────────
  *
- * Two properties worth keeping:
+ * The baseline is the price at the lock and the four checkpoints run
+ * weekly from there; checkpointDueDates in lib/scoring.ts is the single
+ * definition, shared with the admin grid so the two entry paths cannot
+ * disagree. Two properties are worth keeping:
  *
- *  - It only ever writes the checkpoint it is standing in, and only if
- *    that checkpoint is still empty. A live quote cannot tell you last
- *    week's price, so a missed week stays missed and is reported rather
- *    than quietly backfilled with today's number. This is also what makes
- *    a daily schedule safe: yesterday's w1 is not overwritten today.
+ *  - Only the checkpoint the run is standing in is ever written, and
+ *    only when it is still empty. A live quote cannot tell you last
+ *    week's close, so a missed week stays missed and is reported rather
+ *    than backfilled with today's number. That is also what makes it
+ *    safe to run every day.
  *
- *  - It prices every round still inside its window, not just the newest
- *    unsettled one. Opening February before settling January used to stop
- *    January getting checkpoints for the rest of its life.
+ *  - Every round still inside its window is priced, not just the newest
+ *    unsettled one. Opening February before settling January used to
+ *    stop January getting checkpoints for the rest of its life.
+ *
+ * ── Why there are three ways in ───────────────────────────────────────
+ *
+ * GET ?plan=1  says what is needed and stops. Nothing is fetched.
+ * POST {quotes} writes prices somebody else fetched.
+ * GET          fetches through PRICE_PROVIDER and writes, in one go.
+ *
+ * The split exists because of a rate limit. Twelve Data's free tier
+ * allows eight symbols a minute, so thirty instruments take about four
+ * minutes — and a Vercel Hobby function is killed at sixty seconds. The
+ * fetching therefore happens in a GitHub Action, which has hours, while
+ * every decision about *what* a price means stays here. The Action is
+ * deliberately ignorant: it is handed a list of symbols with their
+ * exchange codes and hands back numbers.
+ *
+ * All three need the CRON_SECRET.
  */
-export async function GET(request: NextRequest) {
+
+function authorized(request: NextRequest): boolean | null {
   const expected = (() => {
     try {
       return serverEnv.cronSecret();
@@ -41,39 +57,224 @@ export async function GET(request: NextRequest) {
       return null;
     }
   })();
+  if (!expected) return null;
+  return request.headers.get("authorization") === `Bearer ${expected}`;
+}
 
-  if (!expected) {
-    return NextResponse.json({ error: "CRON_SECRET is not configured." }, { status: 500 });
-  }
+type Db = ReturnType<typeof adminDb>;
 
-  const authorization = request.headers.get("authorization");
-  if (authorization !== `Bearer ${expected}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+/** One round's worth of work: which checkpoint, and what is still missing. */
+type RoundPlan = {
+  roundId: string;
+  checkpoint: number;
+  field: string;
+  dueAt: string | null;
+  /** Instruments with no value at this checkpoint yet. */
+  requests: (PriceRequest & { mic: string })[];
+  /** Earlier checkpoints that were never recorded, for the admin to fill. */
+  gaps: string[];
+};
 
-  const db = adminDb();
-  const now = new Date();
-
+/**
+ * What every open round still needs, without fetching anything.
+ *
+ * Reads are shared across rounds: the instruments collection is fetched
+ * once however many months are open at the same time.
+ */
+async function buildPlan(db: Db, now: Date): Promise<RoundPlan[]> {
   const roundsSnap = await db.collection("rounds").get();
   const open = roundsSnap.docs
     .map((d) => ({ ...(d.data() as Round), id: d.id }))
     .filter((r) => r.status !== "settled" && isPricingOpen(r, now))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  if (open.length === 0) {
-    return NextResponse.json({ ok: true, note: "No round is inside its pricing window." });
-  }
+  if (open.length === 0) return [];
 
   const instrumentsSnap = await db.collection("instruments").get();
   const instruments = new Map(
     instrumentsSnap.docs.map((d) => [d.id, { id: d.id, ...(d.data() as Record<string, unknown>) }]),
   );
 
+  const plans: RoundPlan[] = [];
+
+  for (const round of open) {
+    const checkpoint = currentCheckpoint(round, now);
+    if (checkpoint === null) continue;
+
+    const [picksSnap, pricesSnap] = await Promise.all([
+      db.collection(`rounds/${round.id}/picks`).get(),
+      db.collection(`rounds/${round.id}/prices`).get(),
+    ]);
+
+    // Everything held this month, plus the benchmarks.
+    const wanted = new Set<string>();
+    for (const pickDoc of picksSnap.docs) {
+      for (const id of Object.keys((pickDoc.data().picks ?? {}) as Record<string, unknown>)) {
+        wanted.add(id);
+      }
+    }
+    for (const [id, instrument] of instruments) {
+      if ((instrument as { isBenchmark?: boolean }).isBenchmark) wanted.add(id);
+    }
+
+    const existing = new Map(
+      pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]),
+    );
+    const field = WEEK_FIELDS[checkpoint];
+    const requests: (PriceRequest & { mic: string })[] = [];
+    const gaps: string[] = [];
+
+    for (const id of wanted) {
+      const instrument = instruments.get(id) as
+        | { symbol?: string; marketCode?: string; currency?: string }
+        | undefined;
+      if (!instrument?.symbol) continue;
+
+      const current = existing.get(id);
+
+      for (let k = 0; k < checkpoint; k++) {
+        if (typeof current?.[WEEK_FIELDS[k]] !== "number") {
+          gaps.push(`${instrument.symbol}:${WEEK_FIELDS[k]}`);
+        }
+      }
+
+      if (typeof current?.[field] === "number") continue;
+
+      const marketCode = instrument.marketCode ?? "";
+      requests.push({
+        instrumentId: id,
+        symbol: instrument.symbol,
+        marketCode,
+        currency: instrument.currency ?? "",
+        // The exchange, so a feed can tell Sanofi from Banco Santander.
+        mic: MARKET_MIC[marketCode] ?? "",
+      });
+    }
+
+    const due = checkpointDueDates(round);
+    plans.push({
+      roundId: round.id,
+      checkpoint,
+      field,
+      dueAt: due ? due[checkpoint].toISOString() : null,
+      requests,
+      gaps,
+    });
+  }
+
+  return plans;
+}
+
+/** Writes the quotes that belong to this plan, and records the run. */
+async function writeQuotes(
+  db: Db,
+  plan: RoundPlan,
+  quotes: Quote[],
+  source: string,
+  error: string | null,
+): Promise<{ roundId: string; checkpoint: number; written: number; gaps: number; error: string | null }> {
+  const byId = new Map(plan.requests.map((r) => [r.instrumentId, r]));
+  let written = 0;
+
+  if (quotes.length > 0) {
+    const batch = db.batch();
+    for (const quote of quotes) {
+      const id = String(quote.instrumentId);
+      const request = byId.get(id);
+      // Only what this plan asked for, and only a usable number. A quote
+      // for something already recorded is ignored rather than allowed to
+      // overwrite a checkpoint that is meant to be final.
+      if (!request || !Number.isFinite(quote.price) || quote.price <= 0) continue;
+
+      batch.set(
+        db.doc(`rounds/${plan.roundId}/prices/${id}`),
+        {
+          instrumentId: id,
+          symbol: request.symbol,
+          currency: request.currency,
+          [plan.field]: quote.price,
+          source,
+          updatedAt: new Date(),
+        },
+        { merge: true },
+      );
+      written += 1;
+    }
+    if (written > 0) await batch.commit();
+  }
+
+  await db.collection("priceRuns").add({
+    roundId: plan.roundId,
+    checkpoint: plan.checkpoint,
+    field: plan.field,
+    dueAt: plan.dueAt,
+    source,
+    written,
+    awaiting: plan.requests.length - written,
+    // Capped: a run where everything is missing should not write a
+    // document listing every instrument in the league.
+    gaps: plan.gaps.slice(0, 20),
+    gapCount: plan.gaps.length,
+    note: error,
+    createdAt: new Date(),
+  });
+
+  return {
+    roundId: plan.roundId,
+    checkpoint: plan.checkpoint,
+    written,
+    gaps: plan.gaps.length,
+    error,
+  };
+}
+
+export async function GET(request: NextRequest) {
+  const ok = authorized(request);
+  if (ok === null) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured." }, { status: 500 });
+  }
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = adminDb();
+  const now = new Date();
+  const plans = await buildPlan(db, now);
+
+  // Say what is needed and stop. This is what the GitHub Action asks for.
+  if (request.nextUrl.searchParams.get("plan") === "1") {
+    return NextResponse.json({
+      ok: true,
+      at: now.toISOString(),
+      rounds: plans.map((p) => ({
+        roundId: p.roundId,
+        checkpoint: p.checkpoint,
+        field: p.field,
+        dueAt: p.dueAt,
+        gaps: p.gaps.length,
+        requests: p.requests,
+      })),
+    });
+  }
+
+  if (plans.length === 0) {
+    return NextResponse.json({ ok: true, note: "No round is inside its pricing window." });
+  }
+
   const provider = getPriceProvider();
   const results = [];
 
-  for (const round of open) {
-    results.push(await priceRound(db, round, instruments, provider, now));
+  for (const plan of plans) {
+    if (plan.requests.length === 0) {
+      results.push({ roundId: plan.roundId, checkpoint: plan.checkpoint, written: 0, gaps: plan.gaps.length, error: null });
+      continue;
+    }
+    let quotes: Quote[] = [];
+    let error: string | null = null;
+    try {
+      quotes = (await provider.fetchQuotes(plan.requests)).quotes;
+    } catch (caught) {
+      error = caught instanceof Error ? caught.message : "The price provider failed.";
+    }
+    results.push(await writeQuotes(db, plan, quotes, provider.name, error));
   }
 
   return NextResponse.json({
@@ -83,130 +284,46 @@ export async function GET(request: NextRequest) {
   });
 }
 
-type Db = ReturnType<typeof adminDb>;
-type Provider = ReturnType<typeof getPriceProvider>;
+/**
+ * Prices fetched elsewhere.
+ *
+ * The body is a flat list of {instrumentId, price}; which checkpoint each
+ * belongs to is decided here, not by the caller. A quote for something
+ * this run did not ask for is dropped, so a stale or replayed request
+ * cannot rewrite a checkpoint that is already final.
+ */
+export async function POST(request: NextRequest) {
+  const ok = authorized(request);
+  if (ok === null) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured." }, { status: 500 });
+  }
+  if (!ok) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-async function priceRound(
-  db: Db,
-  round: Round,
-  instruments: Map<string, Record<string, unknown>>,
-  provider: Provider,
-  now: Date,
-) {
-  const checkpoint = currentCheckpoint(round, now);
-  if (checkpoint === null) {
-    return { round: round.id, note: "Not locked yet.", written: 0, error: null };
+  let body: { quotes?: Quote[]; source?: string; note?: string };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
   }
 
-  const [picksSnap, pricesSnap] = await Promise.all([
-    db.collection(`rounds/${round.id}/picks`).get(),
-    db.collection(`rounds/${round.id}/prices`).get(),
-  ]);
-
-  // Everything held this month, plus the benchmarks.
-  const wanted = new Set<string>();
-  for (const pickDoc of picksSnap.docs) {
-    for (const id of Object.keys((pickDoc.data().picks ?? {}) as Record<string, unknown>)) {
-      wanted.add(id);
-    }
-  }
-  for (const [id, instrument] of instruments) {
-    if ((instrument as { isBenchmark?: boolean }).isBenchmark) wanted.add(id);
+  const quotes = Array.isArray(body.quotes) ? body.quotes : null;
+  if (!quotes) {
+    return NextResponse.json({ error: "Expected { quotes: [{instrumentId, price}] }." }, { status: 400 });
   }
 
-  if (wanted.size === 0) {
-    return { round: round.id, note: "Nothing is held this month.", written: 0, error: null };
+  const db = adminDb();
+  const plans = await buildPlan(db, new Date());
+  if (plans.length === 0) {
+    return NextResponse.json({ ok: true, note: "No round is inside its pricing window." });
   }
 
-  const existing = new Map(pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]));
-  const field = WEEK_FIELDS[checkpoint];
+  const source = typeof body.source === "string" && body.source ? body.source.slice(0, 40) : "external";
+  const note = typeof body.note === "string" && body.note ? body.note.slice(0, 500) : null;
 
-  const requests: PriceRequest[] = [];
-  const gaps: string[] = [];
-
-  for (const id of wanted) {
-    const instrument = instruments.get(id) as
-      | { symbol?: string; marketCode?: string; currency?: string }
-      | undefined;
-    if (!instrument?.symbol) continue;
-
-    const current = existing.get(id);
-
-    // Earlier checkpoints that never got recorded. Reported, never
-    // guessed at — today's quote is not last week's close.
-    for (let k = 0; k < checkpoint; k++) {
-      if (typeof current?.[WEEK_FIELDS[k]] !== "number") {
-        gaps.push(`${instrument.symbol}:${WEEK_FIELDS[k]}`);
-      }
-    }
-
-    // Already recorded for this checkpoint: leave it alone. This is what
-    // makes a daily schedule safe.
-    if (typeof current?.[field] === "number") continue;
-
-    requests.push({
-      instrumentId: id,
-      symbol: instrument.symbol,
-      marketCode: instrument.marketCode ?? "",
-      currency: instrument.currency ?? "",
-    });
+  const results = [];
+  for (const plan of plans) {
+    results.push(await writeQuotes(db, plan, quotes, source, note));
   }
 
-  let written = 0;
-  let awaiting = 0;
-  let error: string | null = null;
-
-  if (requests.length > 0) {
-    try {
-      const result = await provider.fetchQuotes(requests);
-      awaiting = result.missing.length;
-
-      if (result.quotes.length > 0) {
-        const batch = db.batch();
-        for (const quote of result.quotes) {
-          const id = String(quote.instrumentId);
-          if (!Number.isFinite(quote.price) || quote.price <= 0) continue;
-          const instrument = instruments.get(id) as
-            | { symbol?: string; currency?: string }
-            | undefined;
-
-          batch.set(
-            db.doc(`rounds/${round.id}/prices/${id}`),
-            {
-              instrumentId: id,
-              symbol: instrument?.symbol ?? id,
-              currency: instrument?.currency ?? "",
-              [field]: quote.price,
-              source: provider.name,
-              updatedAt: new Date(),
-            },
-            { merge: true },
-          );
-          written += 1;
-        }
-        await batch.commit();
-      }
-    } catch (caught) {
-      error = caught instanceof Error ? caught.message : "The price provider failed.";
-    }
-  }
-
-  const due = checkpointDueDates(round);
-  await db.collection("priceRuns").add({
-    roundId: round.id,
-    checkpoint,
-    field,
-    dueAt: due ? due[checkpoint] : null,
-    source: provider.name,
-    written,
-    awaiting,
-    // Capped: a run where every instrument is missing should not write a
-    // document listing every instrument.
-    gaps: gaps.slice(0, 20),
-    gapCount: gaps.length,
-    note: error,
-    createdAt: new Date(),
-  });
-
-  return { round: round.id, checkpoint, field, written, awaiting, gaps: gaps.length, error };
+  return NextResponse.json({ ok: true, source, rounds: results });
 }

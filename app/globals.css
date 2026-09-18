@@ -252,6 +252,29 @@ a:hover { text-decoration: underline; }
   display: flex;
   gap: var(--s1);
   flex-wrap: wrap;
+  /* Big enough never to clip the real width; the point is only to have
+     a number to animate down to zero. */
+  max-width: 1000px;
+  overflow: hidden;
+  /* The active page's underline hangs 13px below its link, level with
+     the masthead's border, which `overflow: hidden` would cut off. The
+     padding gives it room inside the box and the negative margin takes
+     that room straight back out of the layout, so the bar is unmoved. */
+  padding-bottom: 16px;
+  margin-bottom: -16px;
+  transition:
+    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
+}
+
+/* Opening the search slides the field left across the tabs, and they
+   fold away behind it. The attribute is set on <html> by the Search
+   component: the nav is a previous sibling of it, and CSS cannot look
+   backwards. */
+html[data-search-open="1"] .nav {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Active pages get a rule under the label rather than a filled chip:
@@ -588,9 +611,14 @@ th.center, td.center { text-align: center; }
   position: relative;
   display: none;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  min-width: 0;
+  /* Right-aligned, so the field opens away from the icon and towards
+     the tabs rather than pushing the sign-out button off the end. */
+  justify-content: flex-end;
 }
 html[data-player="1"] .search { display: inline-flex; }
+html[data-search-open="1"] .search { flex: 1 1 auto; }
 
 .search-trigger {
   display: grid;
@@ -617,8 +645,11 @@ html[data-player="1"] .search { display: inline-flex; }
 /* Slides out of the button rather than appearing beside it. Width and
    padding are both animated so the field has no size at all while it is
    shut and cannot push the nav around. */
+/* max-width rather than width, so the field can be a flex item that
+   fills whatever the collapsing nav hands back — and still animate. */
 .search-field {
-  width: 0;
+  flex: 1 1 auto;
+  max-width: 0;
   min-width: 0;
   padding: 6px 0;
   border: 1px solid transparent;
@@ -629,24 +660,21 @@ html[data-player="1"] .search { display: inline-flex; }
   opacity: 0;
   pointer-events: none;
   transition:
-    width 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.26s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.16s ease,
-    border-color 0.16s ease;
+    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease,
+    border-color 0.2s ease;
 }
 .search.is-open .search-field {
-  width: 210px;
+  max-width: 460px;
   padding: 6px 10px;
   border-color: var(--line-strong);
   opacity: 1;
   pointer-events: auto;
 }
 
-@media (max-width: 720px) {
-  .search.is-open .search-field { width: 150px; }
-}
-
 @media (prefers-reduced-motion: reduce) {
+  .nav,
   .search-field { transition: opacity 0.16s ease; }
 }
 

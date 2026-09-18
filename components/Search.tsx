@@ -96,6 +96,24 @@ export function Search() {
     if (open) inputRef.current?.focus();
   }, [open]);
 
+  /**
+   * The open state goes on <html> so the masthead's navigation can react
+   * to it: the field slides left across the tabs, and they fold away
+   * behind it.
+   *
+   * An attribute rather than a class on a shared parent because the nav
+   * is a previous sibling of this component — CSS cannot look backwards,
+   * and the alternative is lifting this state into Masthead so it can
+   * pass it to both. It is also how the rest of the app already answers
+   * "who is looking at this"; see applyHintAttributes.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    if (open) root.setAttribute("data-search-open", "1");
+    else root.removeAttribute("data-search-open");
+    return () => root.removeAttribute("data-search-open");
+  }, [open]);
+
   const results = useMemo<Target[]>(() => {
     const needle = fold(query.trim());
 
@@ -145,6 +163,21 @@ export function Search() {
 
   return (
     <div ref={rootRef} className={`search${open ? " is-open" : ""}`}>
+      {/* The field comes first so it grows leftwards, out of the icon and
+          across the navigation. Always in the markup so it has a width to
+          animate from, and out of the tab order while it is shut. */}
+      <input
+        ref={inputRef}
+        className="search-field"
+        value={query}
+        placeholder="Find a player or a page…"
+        tabIndex={open ? 0 : -1}
+        aria-hidden={!open}
+        aria-label="Search players and pages"
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+
       <button
         type="button"
         className="search-trigger"
@@ -157,20 +190,6 @@ export function Search() {
           <path d="M13 13 L17 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </button>
-
-      {/* Always in the markup so the field has a width to slide out from,
-          and out of the tab order while it is closed. */}
-      <input
-        ref={inputRef}
-        className="search-field"
-        value={query}
-        placeholder="Player or page…"
-        tabIndex={open ? 0 : -1}
-        aria-hidden={!open}
-        aria-label="Search players and pages"
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={onKeyDown}
-      />
 
       {open ? (
         <div className="search-drop" role="listbox" aria-label="Search results">

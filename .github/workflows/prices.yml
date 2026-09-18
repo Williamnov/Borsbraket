@@ -1,0 +1,54 @@
+name: Prices
+
+# The weekly checkpoint.
+#
+# This is not a Vercel cron for a concrete reason: Twelve Data's free
+# tier allows eight symbols a minute, so thirty instruments take about
+# four minutes of paced requests and a Vercel Hobby function is killed at
+# sixty seconds. It also sidesteps Hobby's daily-only cron schedules, and
+# a failed workflow emails you — which is the alert a job whose failure
+# mode is silence has been missing.
+#
+# Daily rather than weekly, because what gets recorded is decided by the
+# round's own clock: the baseline is the price at the lock, and the lock
+# is rarely a Monday. The app writes only the checkpoint it is standing
+# in, and only when that one is still empty, so a daily run records
+# nothing extra — it just means the baseline lands within a day of the
+# lock instead of drifting to the next Monday.
+#
+# Needs three secrets: SITE_URL, CRON_SECRET (matching Vercel's) and
+# TWELVEDATA_API_KEY.
+
+on:
+  schedule:
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+
+# Two runs at once would both see the same checkpoint empty and both try
+# to fill it. The second is harmless — the app ignores a quote for
+# something already recorded — but there is no reason to pay for it.
+concurrency:
+  group: prices
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    name: Fetch and record
+    runs-on: ubuntu-latest
+    # Generous: the pacing is deliberate, not a hang. Four minutes for
+    # thirty symbols, plus room for a month where everyone picks widely.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # No install: the script is plain node with global fetch.
+      - name: Fetch prices
+        run: node scripts/fetch-prices.mjs
+        env:
+          SITE_URL: ${{ secrets.SITE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
