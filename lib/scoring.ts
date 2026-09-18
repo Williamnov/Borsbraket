@@ -259,11 +259,71 @@ export function sortEntries(
   });
 }
 
-/** Which weekly checkpoint a date falls in, 1-4, counting from the round start. */
-export function weekIndexFor(round: Round, when: Date): number {
-  const start = new Date(`${round.startsOn}T00:00:00Z`);
-  const days = Math.floor((when.getTime() - start.getTime()) / 86_400_000);
-  return Math.min(WEEKS_PER_ROUND, Math.max(1, Math.floor(days / 7) + 1));
+const DAY_MS = 86_400_000;
+
+/**
+ * When each checkpoint is due: the baseline at the lock, then weekly.
+ *
+ * ── Why the lock and not the first of the month ───────────────────────
+ *
+ * A month has to be measured from somewhere, and the two candidates are
+ * not equally fair. Picks open on the 1st and seal on the 4th. If the
+ * baseline were the month's opening price, anyone submitting on the 3rd
+ * would already have seen three days of trading and could pick something
+ * that had *already* moved, banking a gain that happened before they
+ * chose. The later you submit, the more free information you get.
+ *
+ * Measuring from the lock removes that entirely: everyone's baseline is
+ * the same price at the same instant, and it is an instant nobody can
+ * see past. The cost is that "January" means the 4th to the 1st of
+ * February rather than the calendar month, which is the honest trade —
+ * the scoreboard measures your picks, and your picks do not exist until
+ * they are sealed.
+ *
+ * ── Why this function exists at all ───────────────────────────────────
+ *
+ * The cron used to write the opening price on the first run that found
+ * none, which with a Monday schedule meant w0 became the first-Monday
+ * price — so a month was measured Monday-to-Monday, and entering the
+ * same month by hand from the admin grid produced a different baseline.
+ * Both paths now read their answer from here, so they cannot disagree.
+ */
+export function checkpointDueDates(round: Round): Date[] | null {
+  const lock = toDate(round.locksAt);
+  if (!lock) return null;
+  return [0, 1, 2, 3, 4].map((k) => new Date(lock.getTime() + k * 7 * DAY_MS));
+}
+
+/**
+ * Which checkpoint `when` belongs to, 0-4, or null before the lock.
+ *
+ * A run records only the checkpoint it is standing in. It cannot invent
+ * last week's price from a live quote, so a checkpoint that was missed
+ * stays missing and is reported for manual entry rather than quietly
+ * backfilled with today's number.
+ */
+export function currentCheckpoint(round: Round, when: Date): number | null {
+  const due = checkpointDueDates(round);
+  if (!due || when < due[0]) return null;
+  for (let k = WEEKS_PER_ROUND; k >= 0; k--) {
+    if (when >= due[k]) return k;
+  }
+  return null;
+}
+
+/**
+ * How long after the final checkpoint the cron keeps looking at a round.
+ * Enough that a week of failed runs can still be caught up by hand.
+ */
+export const PRICING_GRACE_DAYS = 7;
+
+/** Whether this round is still within its pricing window. */
+export function isPricingOpen(round: Round, when: Date): boolean {
+  const due = checkpointDueDates(round);
+  if (!due) return false;
+  return (
+    when >= due[0] && when.getTime() <= due[WEEKS_PER_ROUND].getTime() + PRICING_GRACE_DAYS * DAY_MS
+  );
 }
 
 /** Sensible defaults for a fresh month: opens on the 1st, locks on the 4th. */

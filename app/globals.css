@@ -44,6 +44,7 @@
      on <html>. The fallbacks keep the page readable if a face fails to load. */
   --font-body: var(--font-sans-face, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-display-face, ui-sans-serif), system-ui, sans-serif;
+  --font-brand: var(--font-brand-face, ui-sans-serif), system-ui, sans-serif;
   --font-mono: var(--font-mono-face, ui-monospace), "SFMono-Regular", Menlo, monospace;
 }
 
@@ -219,26 +220,36 @@ a:hover { text-decoration: underline; }
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 18px;
-  letter-spacing: -0.025em;
+  gap: 10px;
   color: var(--ink);
   margin-right: auto;
 }
 .brand:hover { text-decoration: none; }
 
-/* The favicon mark, repeated in the masthead so the tab and the page
-   agree with each other. It inherits the brand's colour. */
+/* The wordmark. A separate face from the rest of the app because the
+   logo is geometric and the display face is not — see app/layout.tsx. */
+.brand-word {
+  font-family: var(--font-brand);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+/* The crown, the same drawing as the favicon so the tab and the page
+   agree. Wider than it is tall, so the box is not square. It inherits
+   the brand's colour through currentColor. */
 .brand-mark {
-  width: 22px;
-  height: 22px;
+  width: 27px;
+  height: 19px;
   flex: 0 0 auto;
   color: var(--ink-2);
-  transition: color 0.16s ease;
+  transition: color 0.16s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.brand:hover .brand-mark { color: var(--accent); }
+.brand:hover .brand-mark {
+  color: var(--accent);
+  transform: translateY(-1px);
+}
 
 .nav {
   display: flex;

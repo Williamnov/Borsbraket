@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSeason,
+  checkpointDueDates,
+  currentCheckpoint,
   instrumentReturn,
+  isPricingOpen,
   pointsForRank,
   roundPhase,
   scoreRound,
   sortEntries,
   sortSeason,
-  weekIndexFor,
   weeklyPath,
 } from "../../lib/scoring";
 import type { PicksDoc, PriceDoc, Round, ScoredEntry, SeasonRow } from "../../lib/types";
@@ -330,39 +332,85 @@ describe("sortEntries", () => {
   });
 });
 
-// ── weekIndexFor ──────────────────────────────────────────────────────
+// ── Checkpoints ───────────────────────────────────────────────────────
 
-describe("weekIndexFor", () => {
-  const january = round("2026-01");
-  const on = (iso: string) => weekIndexFor(january, new Date(iso));
-
-  it("counts weeks from the first day of the month", () => {
-    expect(on("2026-01-01T00:00:00Z")).toBe(1);
-    expect(on("2026-01-07T23:59:00Z")).toBe(1);
-    expect(on("2026-01-08T00:00:00Z")).toBe(2);
-    expect(on("2026-01-15T00:00:00Z")).toBe(3);
-    expect(on("2026-01-22T00:00:00Z")).toBe(4);
+describe("checkpointDueDates", () => {
+  it("starts at the lock, then every seven days", () => {
+    // January 2026 locks on the 4th at 07:00Z.
+    const due = checkpointDueDates(round("2026-01"));
+    expect(due?.map((d) => d.toISOString().slice(0, 10))).toEqual([
+      "2026-01-04",
+      "2026-01-11",
+      "2026-01-18",
+      "2026-01-25",
+      "2026-02-01",
+    ]);
   });
 
-  it("clamps to the four weeks the round actually has", () => {
-    expect(on("2026-02-10T00:00:00Z")).toBe(4);
-    expect(on("2025-12-25T00:00:00Z")).toBe(1);
+  it("has nothing to say about a round with no lock", () => {
+    expect(checkpointDueDates({ ...round("2026-01"), locksAt: null })).toBeNull();
+  });
+});
+
+describe("currentCheckpoint", () => {
+  const january = round("2026-01");
+  const at = (iso: string) => currentCheckpoint(january, new Date(iso));
+
+  /**
+   * The baseline is the price at the lock, not the price on the 1st.
+   *
+   * Picks open on the 1st and seal on the 4th. Measuring from the
+   * month's open would hand whoever submits last three days of hindsight
+   * — they could pick something that had already moved and bank a gain
+   * that happened before they chose. Everyone's baseline is now the same
+   * price at the same instant.
+   */
+  it("records nothing before the lock", () => {
+    expect(at("2026-01-01T06:00:00Z")).toBeNull();
+    expect(at("2026-01-03T23:59:00Z")).toBeNull();
+    // The first cron run of the month no longer sets the opening price
+    // just because it happens to be the first one to look.
+    expect(at("2026-01-05T06:00:00Z")).toBe(0);
+  });
+
+  it("counts the weeks from the lock rather than from the month", () => {
+    expect(at("2026-01-04T07:00:00Z")).toBe(0);
+    expect(at("2026-01-10T23:00:00Z")).toBe(0);
+    expect(at("2026-01-11T07:00:00Z")).toBe(1);
+    expect(at("2026-01-18T07:00:00Z")).toBe(2);
+    expect(at("2026-01-25T07:00:00Z")).toBe(3);
+    expect(at("2026-02-01T07:00:00Z")).toBe(4);
+  });
+
+  it("stays at the last checkpoint once the month has run out", () => {
+    expect(at("2026-02-20T07:00:00Z")).toBe(4);
+  });
+});
+
+describe("isPricingOpen", () => {
+  const january = round("2026-01");
+
+  it("is shut before the lock and open through the four weeks", () => {
+    expect(isPricingOpen(january, new Date("2026-01-02T00:00:00Z"))).toBe(false);
+    expect(isPricingOpen(january, new Date("2026-01-04T07:00:00Z"))).toBe(true);
+    expect(isPricingOpen(january, new Date("2026-02-01T07:00:00Z"))).toBe(true);
+  });
+
+  it("allows a week's grace to catch up a missed run, then closes", () => {
+    expect(isPricingOpen(january, new Date("2026-02-07T07:00:00Z"))).toBe(true);
+    expect(isPricingOpen(january, new Date("2026-02-20T07:00:00Z"))).toBe(false);
   });
 
   /**
-   * Documents a real disagreement rather than asserting it is right.
-   *
-   * Picks lock on the 4th and the cron runs on Mondays, so the first run
-   * that finds no opening price is after the lock — which makes w0 the
-   * first-Monday price and measures the month Monday-to-Monday. Entering
-   * the same month by hand from the admin grid gives a different w0.
-   * Both paths are self-consistent and they do not agree with each other.
+   * The cron prices every round inside its window, not just the newest
+   * unsettled one — opening February before settling January used to
+   * stop January getting checkpoints for the rest of its life.
    */
-  it("indexes the same as the first Monday run regardless of the lock", () => {
-    // Monday 5 January 2026, the first cron run of that month, is still
-    // week 1 — so the price it records is w1's by this function's
-    // reckoning but w0's by the cron's "no open yet" rule.
-    expect(on("2026-01-05T06:00:00Z")).toBe(1);
+  it("is open for two overlapping rounds at once", () => {
+    const february = round("2026-02", "open");
+    const when = new Date("2026-02-05T07:00:00Z");
+    expect(isPricingOpen(january, when)).toBe(true);
+    expect(isPricingOpen(february, when)).toBe(true);
   });
 });
 

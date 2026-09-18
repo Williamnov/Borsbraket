@@ -4,11 +4,28 @@ import { useMemo, useState } from "react";
 import { doc, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
 import { Empty, Value } from "@/components/ui";
-import { instrumentReturn } from "@/lib/scoring";
+import { checkpointDueDates, instrumentReturn } from "@/lib/scoring";
 import type { Instrument, PicksDoc, PriceDoc, Round } from "@/lib/types";
 
-const WEEK_LABELS = ["Open", "Week 1", "Week 2", "Week 3", "Week 4"];
+const WEEK_LABELS = ["Baseline", "Week 1", "Week 2", "Week 3", "Week 4"];
 const WEEK_FIELDS = ["w0", "w1", "w2", "w3", "w4"] as const;
+
+/**
+ * The date each column is meant to hold, read from the same function the
+ * cron uses.
+ *
+ * This is the other half of making the two entry paths agree. The
+ * baseline is the price at the lock and the weeks run from there, which
+ * is not something you can guess from a column headed "Open" — and
+ * guessing wrong by a few days moves every return that month.
+ */
+function dueLabels(round: Round): (string | null)[] {
+  const due = checkpointDueDates(round);
+  if (!due) return WEEK_FIELDS.map(() => null);
+  return due.map((d) =>
+    d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+  );
+}
 
 function parseNumber(raw: string): number | null {
   const cleaned = raw.replace(/\s/g, "").replace(",", ".");
@@ -33,6 +50,7 @@ export function PriceGrid({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
   const [bulkWeek, setBulkWeek] = useState(1);
+  const due = useMemo(() => dueLabels(round), [round]);
   const [bulkText, setBulkText] = useState("");
 
   /** Everything picked this month, plus the benchmarks. */
@@ -188,8 +206,15 @@ export function PriceGrid({
             <thead>
               <tr>
                 <th>Ticker</th>
-                {WEEK_LABELS.map((label) => (
-                  <th key={label}>{label}</th>
+                {WEEK_LABELS.map((label, week) => (
+                  <th key={label}>
+                    {label}
+                    {due[week] ? (
+                      <span className="hint" style={{ display: "block", fontWeight: 400 }}>
+                        {due[week]}
+                      </span>
+                    ) : null}
+                  </th>
                 ))}
                 <th className="right">Return</th>
                 <th className="center">Held by</th>
@@ -245,6 +270,7 @@ export function PriceGrid({
               {WEEK_LABELS.map((label, index) => (
                 <option key={label} value={index}>
                   {label}
+                  {due[index] ? ` · ${due[index]}` : ""}
                 </option>
               ))}
             </select>

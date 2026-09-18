@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!--
+    The favicon. Same crown as components/BrandMark.tsx, shifted into a
+    square box with a little breathing room, and with the colour fixed
+    rather than inherited — a favicon has no surrounding text to take it
+    from. Kept in step with BrandMark by hand.
+  -->
+  <g fill="none" stroke="#3A3A38" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"
+     transform="translate(0 15)">
+    <path d="M7.5 33 L26 55 H74 L92.5 33"/>
+    <rect x="11.45" y="23.45" width="19.09" height="19.09" rx="3" transform="rotate(45 21 33)"/>
+    <rect x="38.69" y="12.69" width="22.63" height="22.63" rx="3" transform="rotate(45 50 24)"/>
+    <rect x="69.45" y="23.45" width="19.09" height="19.09" rx="3" transform="rotate(45 79 33)"/>
+    <path d="M23 63 H77"/>
+  </g>
+</svg>

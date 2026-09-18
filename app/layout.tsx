@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Familjen_Grotesk, IBM_Plex_Mono, Public_Sans } from "next/font/google";
+import { Familjen_Grotesk, IBM_Plex_Mono, Poppins, Public_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import { LeagueProvider } from "@/components/LeagueProvider";
 import { Masthead } from "@/components/Masthead";
@@ -16,6 +16,24 @@ const display = Familjen_Grotesk({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-display-face",
+});
+
+/**
+ * The wordmark only — one word, in the masthead and nowhere else.
+ *
+ * The supplied logo is a geometric sans with circular bowls, which the
+ * body and display faces here are not. A single weight of one subset is
+ * a few kilobytes and next/font serves it from our own origin, so this
+ * costs no third-party request.
+ *
+ * It is a close match rather than the artwork itself. Drop the real
+ * wordmark into public/ and .brand-word becomes an <img>.
+ */
+const brand = Poppins({
+  subsets: ["latin"],
+  weight: ["600"],
+  display: "swap",
+  variable: "--font-brand-face",
 });
 
 const mono = IBM_Plex_Mono({
@@ -40,7 +58,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
+    <html lang="en" className={`${sans.variable} ${display.variable} ${brand.variable} ${mono.variable}`}>
       <body>
         {/*
           Runs before the masthead below it is parsed, so the navigation
