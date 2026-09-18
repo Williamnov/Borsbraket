@@ -10,6 +10,11 @@ The application is written and pushed. **It has never been built or run.** `npm`
 in the environment it was written in, so there is no typecheck or build behind it — Vercel's first
 deploy is the first real compile. Budget for one or two type errors.
 
+That applies to the most recent round of changes too: the CSP middleware, the chat rate limit, the
+`contacts/` split, the unread badge, the profile months table, the sortable month and history
+tables and the rules tests are all unexecuted. `npm install` is needed before anything — three new
+dev dependencies went in with the tests.
+
 Nothing is connected yet: no Firebase project, no Vercel project, no data.
 
 ## Next steps, in order
@@ -17,13 +22,17 @@ Nothing is connected yet: no Firebase project, no Vercel project, no data.
 1. **Create the Firebase project** — Firestore, plus Auth with Email link and Google enabled.
 2. **`cp env.example .env.local`** and fill it in.
 3. **`npm install && npm run typecheck`** — do this before deploying; it catches the compile
-   errors that were never checked.
+   errors that were never checked. Then **`npm run test:rules`**, which starts the Firestore
+   emulator and runs `tests/rules` against `firestore.rules`. It needs a Java runtime.
 4. **`npm run seed`** — writes markets, instruments and league settings.
 5. **`npm run dev`**, sign in once, then **`npm run seed -- --admin your@email.com`** to make
    yourself admin.
 6. **`firebase deploy --only firestore:rules`** — easy to forget, and without it Firestore denies
-   everything. The rules now also cover `chat/` and the profile photo cap, so a stale deploy makes
-   the Chat tab and picture upload fail with a permission error rather than anything clearer.
+   everything. The rules now also cover `chat/`, the profile photo cap, `contacts/` and
+   `rateLimits/`, so a stale deploy makes sign-up itself fail: the first sign-in writes the
+   address to `contacts/{uid}` in the same batch as the profile, and posting to the board needs
+   the `rateLimits/` rule to exist. A stale deploy fails with a bare permission error rather than
+   anything clearer.
 7. **Import the repo on Vercel**, add the same environment variables, deploy.
 8. **Firebase → Authentication → Settings → Authorized domains** — add the Vercel domain, or
    sign-in fails silently.
@@ -50,7 +59,14 @@ Full detail for each step is in the [README](README.md).
   Add names from the admin panel.
 - **Market caps are all null.** `minMarketCapMusd` is only enforced where a value is set, so the
   real penny-stock guard is the curated `eligible` flag you control in the admin panel.
-- **No tests.**
+- **Tests cover `firestore.rules` and nothing else.** `tests/rules` exercises the picks seal, the
+  chat rate limit and the profile/contacts split against the emulator. There is no test of the
+  scoring, the pages or the cron.
+- **Nobody is told when a month opens or is about to lock.** Missing the lock is still silent.
+- **The cron's absence is still invisible.** `priceRuns` records every run that happens; nothing
+  notices one that does not.
+- **No Firebase App Check**, so the web config can still be used from outside the site. The rules
+  are what stop it being useful, but App Check would stop the requests arriving.
 
 ## Things worth not re-litigating
 

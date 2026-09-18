@@ -6,9 +6,9 @@ import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, Panel, RequirePlayer, Reveal, Value } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
-import { buildSeason, scoreRound } from "@/lib/scoring";
-import { displayName } from "@/lib/format";
-import { MAX_PHOTO_CHARS, type ScoredEntry } from "@/lib/types";
+import { buildSeason, roundPhase, scoreRound } from "@/lib/scoring";
+import { displayName, formatPercent, monthLabel } from "@/lib/format";
+import { MAX_PHOTO_CHARS, type Round, type ScoredEntry } from "@/lib/types";
 
 const EMOJI = [
   "📈", "📉", "🦊", "🐻", "🐂", "🚀", "🧊", "🎲", "🦅", "🐺",
@@ -65,7 +65,7 @@ export default function ProfilePage() {
 }
 
 function ProfileEditor() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const { profiles, rounds, loading } = useLeagueBase(true);
 
   const [alias, setAlias] = useState(profile?.alias ?? "");
@@ -77,21 +77,48 @@ function ProfileEditor() {
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const settledIds = useMemo(
-    () => rounds.filter((r) => r.status === "settled").map((r) => r.id),
+  /**
+   * Every month that is no longer taking picks, newest first.
+   *
+   * Not just the settled ones: a month that has locked is already public,
+   * and the running one is exactly the month a player most wants to look
+   * back at. A month still open is excluded because the rules refuse a
+   * listing of its picks — that is the seal, and it applies to your own
+   * page too.
+   */
+  const pastRounds = useMemo(
+    () => rounds.filter((r) => roundPhase(r) !== "open").sort((a, b) => b.id.localeCompare(a.id)),
     [rounds],
   );
-  const { bundles } = useRoundBundles(settledIds, settledIds.length > 0);
+  const pastIds = useMemo(() => pastRounds.map((r) => r.id), [pastRounds]);
+  const { bundles } = useRoundBundles(pastIds, pastIds.length > 0);
 
-  const mine = useMemo(() => {
-    const scored = new Map<string, ScoredEntry[]>();
+  const scored = useMemo(() => {
+    const map = new Map<string, ScoredEntry[]>();
     for (const round of rounds) {
       const bundle = bundles.get(round.id);
-      if (bundle) scored.set(round.id, scoreRound(round, bundle.pickDocs, bundle.prices));
+      if (bundle) map.set(round.id, scoreRound(round, bundle.pickDocs, bundle.prices));
     }
+    return map;
+  }, [rounds, bundles]);
+
+  const mine = useMemo(() => {
+    // buildSeason counts settled months only, so the unsettled ones above
+    // add nothing to these figures.
     const season = buildSeason(rounds, scored, profiles.map((p) => p.uid));
     return season.find((row) => row.uid === profile?.uid) ?? null;
-  }, [rounds, bundles, profiles, profile?.uid]);
+  }, [rounds, scored, profiles, profile?.uid]);
+
+  const myMonths = useMemo<MyMonth[]>(() => {
+    if (!profile) return [];
+    const months: MyMonth[] = [];
+    for (const round of pastRounds) {
+      const entries = scored.get(round.id) ?? [];
+      const entry = entries.find((e) => e.uid === profile.uid);
+      if (entry) months.push({ round, entry, field: entries.length });
+    }
+    return months;
+  }, [pastRounds, scored, profile]);
 
   const preview = useMemo(
     () => (profile ? { ...profile, alias, motto, emoji, color, photoUrl } : null),
@@ -230,7 +257,7 @@ function ProfileEditor() {
                 value={alias}
                 maxLength={24}
                 onChange={(e) => setAlias(e.target.value)}
-                placeholder={profile.email.split("@")[0]}
+                placeholder={profile.handle}
               />
             </label>
 
@@ -306,16 +333,97 @@ function ProfileEditor() {
               <button type="button" className="primary" onClick={() => void save()} disabled={busy}>
                 {busy ? "Saving…" : "Save profile"}
               </button>
-              <span className="hint">Signed in as {profile.email}</span>
+              {/* From the auth session, not the profile document — the
+                  address is not stored there any more, and this browser
+                  is the only one entitled to see it. */}
+              <span className="hint">Signed in as {user?.email}</span>
             </div>
 
             {message ? <div className={`notice ${message.kind}`}>{message.text}</div> : null}
           </div>
         </Panel>
       </Reveal>
+
+      <Reveal delay={80}>
+        <section className="panel" style={{ marginTop: 20 }}>
+          <header>
+            <h2>Your months</h2>
+            <span className="grow" />
+            {myMonths.length > 0 ? (
+              <span className="hint">
+                {myMonths.length} {myMonths.length === 1 ? "month" : "months"} played
+              </span>
+            ) : null}
+          </header>
+          <div className="panel-body flush table-scroll">
+            {myMonths.length === 0 ? (
+              <Empty>
+                Nothing yet. Your picks appear here once the month they belong to has locked.
+              </Empty>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Your picks</th>
+                    <th className="right">Return</th>
+                    <th className="center">Finish</th>
+                    <th className="right">Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {myMonths.map(({ round, entry, field }) => (
+                    <tr key={round.id}>
+                      <td>
+                        <strong>{monthLabel(round.id)}</strong>
+                        {round.status !== "settled" ? (
+                          <div className="hint">still running</div>
+                        ) : null}
+                      </td>
+                      <td>
+                        <span className="tickers">
+                          {entry.picks.map((pick) => (
+                            <span key={pick.instrumentId} className="ticker" title={pick.name}>
+                              <strong>{pick.symbol}</strong>
+                              <span
+                                className={`delta ${
+                                  pick.ret === null ? "" : pick.ret >= 0 ? "up" : "down"
+                                }`}
+                              >
+                                {formatPercent(pick.ret)}
+                              </span>
+                            </span>
+                          ))}
+                        </span>
+                      </td>
+                      <td className="right">
+                        <Value value={entry.ret} precise />
+                        {entry.priced < entry.total ? (
+                          <div className="hint">
+                            {entry.priced}/{entry.total} priced
+                          </div>
+                        ) : null}
+                      </td>
+                      <td className="center mono">
+                        {entry.rank === null ? "–" : `${entry.rank} of ${field}`}
+                      </td>
+                      <td className="right">
+                        <span className="value">{entry.points ?? "–"}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+      </Reveal>
     </>
   );
 }
+
+/** One row of the months table: the month, your entry in it, and how many entered. */
+type MyMonth = { round: Round; entry: ScoredEntry; field: number };
 
 function Stat({ label, value, node }: { label: string; value?: string; node?: React.ReactNode }) {
   return (

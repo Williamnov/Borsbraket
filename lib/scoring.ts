@@ -202,6 +202,63 @@ export function sortSeason(
   });
 }
 
+export type EntrySort = "rank" | "player" | "ret" | "points";
+
+/** Nothing in the column sorts to the bottom, whichever way round it is. */
+function emptyLast(x: number | null, y: number | null): number | null {
+  if (x === null && y === null) return 0;
+  if (x === null) return 1;
+  if (y === null) return -1;
+  return null;
+}
+
+/**
+ * Sort one month's standings.
+ *
+ * Unlike the season table, the leading column here is the real finishing
+ * position rather than a row number, so re-sorting the table never makes
+ * it lie — the rank travels with the row.
+ *
+ * Ties fall back to rank so the order is stable between renders, and a
+ * player with no priced holdings sorts to the bottom either way: flipping
+ * the direction should surface the month's worst return, not the people
+ * the prices have not caught up with.
+ */
+export function sortEntries(
+  entries: ScoredEntry[],
+  by: EntrySort,
+  direction: SortDirection = "asc",
+  nameOf?: (uid: string) => string,
+): ScoredEntry[] {
+  const list = [...entries];
+  const flip = direction === "asc" ? 1 : -1;
+
+  if (by === "player") {
+    const name = (entry: ScoredEntry) => (nameOf ? nameOf(entry.uid) : entry.uid);
+    return list.sort(
+      (a, b) => flip * name(a).localeCompare(name(b), "sv", { sensitivity: "base" }),
+    );
+  }
+
+  if (by === "rank") {
+    return list.sort((a, b) => {
+      const empty = emptyLast(a.rank, b.rank);
+      return empty === null ? flip * ((a.rank ?? 0) - (b.rank ?? 0)) : empty;
+    });
+  }
+
+  const key = (entry: ScoredEntry) => (by === "ret" ? entry.ret : entry.points);
+
+  return list.sort((a, b) => {
+    const x = key(a);
+    const y = key(b);
+    const empty = emptyLast(x, y);
+    if (empty !== null) return empty;
+    if (x === y) return (a.rank ?? Infinity) - (b.rank ?? Infinity);
+    return flip * ((x as number) - (y as number));
+  });
+}
+
 /** Which weekly checkpoint a date falls in, 1-4, counting from the round start. */
 export function weekIndexFor(round: Round, when: Date): number {
   const start = new Date(`${round.startsOn}T00:00:00Z`);

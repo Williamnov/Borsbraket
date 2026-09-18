@@ -6,14 +6,30 @@ import { firestore } from "@/lib/firebase/client";
 import { Empty, PlayerCell } from "@/components/ui";
 import type { Profile, ProfileStatus } from "@/lib/types";
 
-export function Approvals({ profiles, meUid }: { profiles: Profile[]; meUid: string }) {
+/**
+ * Addresses are not on the profile documents — every approved player can
+ * read those. They come from contacts/{uid}, which the rules open to
+ * admins and to nobody else, so this panel is the only place in the app
+ * that shows one.
+ */
+export function Approvals({
+  profiles,
+  emails,
+  meUid,
+}: {
+  profiles: Profile[];
+  emails: Map<string, string>;
+  meUid: string;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const emailOf = (uid: string) => emails.get(uid) ?? "";
 
   const pending = profiles.filter((p) => p.status === "pending");
   const others = profiles
     .filter((p) => p.status !== "pending")
-    .sort((a, b) => a.status.localeCompare(b.status) || (a.email ?? "").localeCompare(b.email ?? ""));
+    .sort((a, b) => a.status.localeCompare(b.status) || emailOf(a.uid).localeCompare(emailOf(b.uid)));
 
   async function setStatus(uid: string, status: ProfileStatus) {
     setBusy(uid);
@@ -68,7 +84,7 @@ export function Approvals({ profiles, meUid }: { profiles: Profile[]; meUid: str
             >
               <div>
                 <PlayerCell profile={p} />
-                <span className="hint">{p.email}</span>
+                <span className="hint">{emailOf(p.uid) || "no address on file"}</span>
               </div>
               <span className="row">
                 <button
@@ -111,7 +127,7 @@ export function Approvals({ profiles, meUid }: { profiles: Profile[]; meUid: str
                     <td>
                       <PlayerCell profile={p} you={p.uid === meUid} />
                     </td>
-                    <td className="hint">{p.email}</td>
+                    <td className="hint">{emailOf(p.uid) || "—"}</td>
                     <td>
                       <span className={`pill ${p.status === "approved" ? "open" : ""}`}>
                         {p.status}

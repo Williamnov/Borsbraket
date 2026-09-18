@@ -10,14 +10,19 @@ import {
   PlayerCell,
   RequirePlayer,
   Reveal,
+  SortHeader,
   StatusPill,
   Value,
   WeekBars,
+  useColumnSort,
 } from "@/components/ui";
 import { useCountdown, useLeagueBase, useMyPicks, useRoundPicks, useRoundPrices, useSubmissions } from "@/lib/hooks";
-import { instrumentReturn, roundPhase, scoreRound, weeklyPath } from "@/lib/scoring";
-import { formatDate, formatPercent, monthLabel } from "@/lib/format";
+import { instrumentReturn, roundPhase, scoreRound, sortEntries, weeklyPath, type EntrySort } from "@/lib/scoring";
+import { displayName, formatDate, formatPercent, monthLabel } from "@/lib/format";
 import { toDate } from "@/lib/types";
+
+/** Columns whose first click should read small-to-large. */
+const ASC_FIRST: readonly EntrySort[] = ["rank", "player"];
 
 export default function MonthPage() {
   return (
@@ -59,6 +64,13 @@ function MonthView() {
         .map((i) => ({ instrument: i, ...instrumentReturn(prices.get(i.id)) }))
         .filter((b) => b.ret !== null),
     [instruments, prices],
+  );
+
+  const { sortBy, direction, onSort } = useColumnSort<EntrySort>("rank", ASC_FIRST);
+
+  const standings = useMemo(
+    () => sortEntries(entries, sortBy, direction, (uid) => displayName(profileMap.get(uid) ?? null)),
+    [entries, sortBy, direction, profileMap],
   );
 
   if (loading) return <Empty>Loading the month…</Empty>;
@@ -187,15 +199,41 @@ function MonthView() {
             <table>
               <thead>
                 <tr>
-                  <th className="center">#</th>
-                  <th>Player</th>
+                  <SortHeader
+                    column="rank"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="center"
+                  >
+                    #
+                  </SortHeader>
+                  <SortHeader column="player" active={sortBy} direction={direction} onSort={onSort}>
+                    Player
+                  </SortHeader>
                   <th>Weeks</th>
-                  <th className="right">Return</th>
-                  <th className="right">Points</th>
+                  <SortHeader
+                    column="ret"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Return
+                  </SortHeader>
+                  <SortHeader
+                    column="points"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Points
+                  </SortHeader>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => {
+                {standings.map((entry) => {
                   const path = [1, 2, 3, 4].map((week) => {
                     const values = entry.picks.map((pick) => {
                       const p = weeklyPath(prices.get(pick.instrumentId))[week - 1];

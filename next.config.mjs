@@ -2,6 +2,10 @@
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Content-Security-Policy is deliberately not here. It carries a
+  // per-request nonce for Next's inline bootstrap scripts, which a static
+  // header cannot do, so it is built in middleware.ts. Everything below
+  // is constant and cheaper to serve from the config.
   async headers() {
     return [
       {

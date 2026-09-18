@@ -2,11 +2,23 @@
 
 import { useMemo } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Empty, PageHead, PlayerCell, RequirePlayer, Reveal, Value } from "@/components/ui";
+import {
+  Empty,
+  PageHead,
+  PlayerCell,
+  RequirePlayer,
+  Reveal,
+  SortHeader,
+  Value,
+  useColumnSort,
+} from "@/components/ui";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
-import { instrumentReturn, scoreRound } from "@/lib/scoring";
+import { instrumentReturn, scoreRound, sortEntries, type EntrySort } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
 import type { Profile, ScoredEntry } from "@/lib/types";
+
+/** Columns whose first click should read small-to-large. */
+const ASC_FIRST: readonly EntrySort[] = ["rank", "player"];
 
 export default function HistoryPage() {
   return (
@@ -74,7 +86,7 @@ function History() {
     <>
       <PageHead title="History">
         {settled.length} settled {settled.length === 1 ? "month" : "months"}. Open one for the full
-        table and every holding.
+        table and every holding; click a column to sort that month by it.
       </PageHead>
 
       <Reveal>
@@ -161,49 +173,7 @@ function History() {
                 ))}
               </summary>
 
-              <div className="table-scroll" style={{ borderTop: "1px solid var(--line)" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th className="center">#</th>
-                      <th>Player</th>
-                      <th>Holdings</th>
-                      <th className="right">Return</th>
-                      <th className="right">Points</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {entries.map((entry) => (
-                      <tr key={entry.uid} className={entry.uid === profile?.uid ? "is-me" : undefined}>
-                        <td className={`rank${entry.rank && entry.rank <= 3 ? ` r${entry.rank}` : ""}`}>
-                          {entry.rank ?? "–"}
-                        </td>
-                        <td>
-                          <PlayerCell profile={profileMap.get(entry.uid)} you={entry.uid === profile?.uid} />
-                        </td>
-                        <td>
-                          <span className="tickers">
-                            {entry.picks.map((pick) => (
-                              <span key={pick.instrumentId} className="ticker" title={pick.name}>
-                                <strong>{pick.symbol}</strong>
-                                <span className={`delta ${pick.ret === null ? "" : pick.ret >= 0 ? "up" : "down"}`}>
-                                  {formatPercent(pick.ret)}
-                                </span>
-                              </span>
-                            ))}
-                          </span>
-                        </td>
-                        <td className="right">
-                          <Value value={entry.ret} precise />
-                        </td>
-                        <td className="right">
-                          <span className="value">{entry.points ?? "–"}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <MonthTable entries={entries} profileMap={profileMap} meUid={profile?.uid} />
             </details>
             </Reveal>
           );
@@ -215,6 +185,105 @@ function History() {
 
 function nameOf(map: Map<string, Profile>, uid: string): string {
   return displayName(map.get(uid) ?? null);
+}
+
+/**
+ * One settled month's full table.
+ *
+ * A component of its own so each month keeps its own sort — opening
+ * three of them and sorting one by return should not disturb the others.
+ * The # column shows the real finishing position rather than a row
+ * number, so it stays true however the table is ordered.
+ */
+function MonthTable({
+  entries,
+  profileMap,
+  meUid,
+}: {
+  entries: ScoredEntry[];
+  profileMap: Map<string, Profile>;
+  meUid: string | undefined;
+}) {
+  const { sortBy, direction, onSort } = useColumnSort<EntrySort>("rank", ASC_FIRST);
+
+  const rows = useMemo(
+    () => sortEntries(entries, sortBy, direction, (uid) => nameOf(profileMap, uid)),
+    [entries, sortBy, direction, profileMap],
+  );
+
+  return (
+    <div className="table-scroll" style={{ borderTop: "1px solid var(--line)" }}>
+      <table>
+        <thead>
+          <tr>
+            <SortHeader
+              column="rank"
+              active={sortBy}
+              direction={direction}
+              onSort={onSort}
+              align="center"
+            >
+              #
+            </SortHeader>
+            <SortHeader column="player" active={sortBy} direction={direction} onSort={onSort}>
+              Player
+            </SortHeader>
+            <th>Holdings</th>
+            <SortHeader
+              column="ret"
+              active={sortBy}
+              direction={direction}
+              onSort={onSort}
+              align="right"
+            >
+              Return
+            </SortHeader>
+            <SortHeader
+              column="points"
+              active={sortBy}
+              direction={direction}
+              onSort={onSort}
+              align="right"
+            >
+              Points
+            </SortHeader>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((entry) => (
+            <tr key={entry.uid} className={entry.uid === meUid ? "is-me" : undefined}>
+              <td className={`rank${entry.rank && entry.rank <= 3 ? ` r${entry.rank}` : ""}`}>
+                {entry.rank ?? "–"}
+              </td>
+              <td>
+                <PlayerCell profile={profileMap.get(entry.uid)} you={entry.uid === meUid} />
+              </td>
+              <td>
+                <span className="tickers">
+                  {entry.picks.map((pick) => (
+                    <span key={pick.instrumentId} className="ticker" title={pick.name}>
+                      <strong>{pick.symbol}</strong>
+                      <span
+                        className={`delta ${pick.ret === null ? "" : pick.ret >= 0 ? "up" : "down"}`}
+                      >
+                        {formatPercent(pick.ret)}
+                      </span>
+                    </span>
+                  ))}
+                </span>
+              </td>
+              <td className="right">
+                <Value value={entry.ret} precise />
+              </td>
+              <td className="right">
+                <span className="value">{entry.points ?? "–"}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 function RecordLine({

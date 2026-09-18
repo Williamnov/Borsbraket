@@ -1,13 +1,21 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { addDoc, collection, deleteDoc, doc, serverTimestamp } from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import { deleteDoc, doc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, RequirePlayer, Reveal } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
+import { postChatMessage } from "@/lib/chat";
+import { markChatRead } from "@/lib/chatRead";
 import { useChat, useLeagueBase } from "@/lib/hooks";
 import { displayName, timeAgo } from "@/lib/format";
-import { MAX_MESSAGE_CHARS, toDate, type ChatMessage, type Profile } from "@/lib/types";
+import {
+  CHAT_MIN_GAP_SECONDS,
+  MAX_MESSAGE_CHARS,
+  toDate,
+  type ChatMessage,
+  type Profile,
+} from "@/lib/types";
 
 export default function ChatPage() {
   return (
@@ -24,6 +32,9 @@ function Board() {
   const { profileMap } = useLeagueBase(true);
   const { messages, loading, error } = useChat(true);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  // The rules enforce the gap between messages; this only stops the
+  // composer from making a request it already knows will be refused.
+  const [nextAllowedAt, setNextAllowedAt] = useState(0);
 
   // Newest thread first, replies oldest first underneath — the way a
   // conversation actually reads.
@@ -60,14 +71,26 @@ function Board() {
     ].sort((a, b) => at(b.root) - at(a.root));
   }, [messages]);
 
+  // Being on this page is what counts as having read it. The mark moves
+  // to whichever is later — this clock or the newest message's own
+  // timestamp — so a server running slightly ahead cannot leave a message
+  // permanently unread.
+  const uid = profile?.uid;
+  useEffect(() => {
+    if (!uid) return;
+    const newest = messages.reduce(
+      (latest, message) => Math.max(latest, toDate(message.createdAt)?.getTime() ?? 0),
+      0,
+    );
+    markChatRead(uid, Math.max(newest, Date.now()));
+  }, [uid, messages]);
+
   async function post(body: string, parentId: string | null) {
     if (!profile) return;
-    await addDoc(collection(firestore(), "chat"), {
-      uid: profile.uid,
-      body: body.trim().slice(0, MAX_MESSAGE_CHARS),
-      parentId,
-      createdAt: serverTimestamp(),
-    });
+    // Writes the message and the poster's rate-limit counter in one
+    // transaction; firestore.rules refuses the message without it.
+    await postChatMessage(firestore(), profile.uid, body, parentId);
+    setNextAllowedAt(Date.now() + CHAT_MIN_GAP_SECONDS * 1000);
     setReplyTo(null);
   }
 
@@ -81,12 +104,14 @@ function Board() {
     <>
       <PageHead title="Chat">
         The league&rsquo;s message board. Everyone approved can read it and post; admins can remove
-        anything. Nothing here touches the scoring.
+        anything. Nothing here touches the scoring. There is a {CHAT_MIN_GAP_SECONDS}-second gap
+        between messages, so an argument stays an argument rather than a wall.
       </PageHead>
 
       <Composer
         placeholder="Defend a pick, or explain one away…"
         submitLabel="Post"
+        cooldownUntil={nextAllowedAt}
         onSubmit={(body) => post(body, null)}
       />
 
@@ -134,6 +159,7 @@ function Board() {
                       autoFocus
                       placeholder="Reply…"
                       submitLabel="Reply"
+                      cooldownUntil={nextAllowedAt}
                       onCancel={() => setReplyTo(null)}
                       onSubmit={(body) => post(body, thread.root.id)}
                     />
@@ -210,6 +236,7 @@ function Composer({
   onCancel,
   compact,
   autoFocus,
+  cooldownUntil = 0,
 }: {
   placeholder: string;
   submitLabel: string;
@@ -217,16 +244,28 @@ function Composer({
   onCancel?: () => void;
   compact?: boolean;
   autoFocus?: boolean;
+  /** Epoch ms before which the rules will refuse another message. */
+  cooldownUntil?: number;
 }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [, tick] = useState(0);
 
+  // Re-render twice a second while the gap counts down, so the button
+  // comes back on its own rather than after the next keystroke.
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const id = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(id);
+  }, [cooldownUntil]);
+
+  const waiting = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
   const left = MAX_MESSAGE_CHARS - body.length;
 
   async function submit(event: React.SyntheticEvent) {
     event.preventDefault();
-    if (!body.trim() || busy) return;
+    if (!body.trim() || busy || waiting > 0) return;
     setBusy(true);
     setError(null);
     try {
@@ -256,14 +295,20 @@ function Composer({
       <div className="row" style={{ justifyContent: "flex-end" }}>
         {left < 200 ? <span className="hint">{left} left</span> : null}
         <span style={{ marginRight: "auto" }} className="hint">
-          Enter sends · Shift+Enter for a new line
+          {waiting > 0
+            ? `Another message in ${waiting}s`
+            : "Enter sends · Shift+Enter for a new line"}
         </span>
         {onCancel ? (
           <button type="button" className="quiet small" onClick={onCancel}>
             Cancel
           </button>
         ) : null}
-        <button type="submit" className="primary small" disabled={busy || !body.trim()}>
+        <button
+          type="submit"
+          className="primary small"
+          disabled={busy || !body.trim() || waiting > 0}
+        >
           {busy ? "Posting…" : submitLabel}
         </button>
       </div>

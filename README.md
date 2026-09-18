@@ -115,7 +115,9 @@ and response shapes differ per vendor, and a guessed shape fails silently at 06:
 ## Data model
 
 ```
-profiles/{uid}                          status, isAdmin, alias, emoji, colour, motto, photoUrl
+profiles/{uid}                          status, isAdmin, handle, alias, emoji, colour, motto, photoUrl
+contacts/{uid}                          the sign-in address — owner and admins only
+rateLimits/{uid}                        how fast one player may post; written with each message
 chat/{messageId}                        the message board — uid, body, parentId, createdAt
 markets/{code}                          the pickable lists
 instruments/{marketCode_SYMBOL}         symbol, name, currency, eligible, isBenchmark
@@ -141,6 +143,19 @@ The repository is public, so the split matters:
 - `.gitignore` blocks `.env*`, keys and certificates, cloud credentials, database dumps and CSV
   exports. Add to it before committing anything new.
 - No player data is in the repository. Emails, picks, messages and results live only in Firestore.
+- **Email addresses are not on the profile.** Every approved player reads every profile document, so
+  anything stored there is league-wide public. The address lives in `contacts/{uid}`, which the rules
+  open to its owner and to admins and to nobody else; the profile keeps `handle`, the part before the
+  `@`, which is what the table falls back to when a player has not set a display name. The rules
+  refuse a handle containing an `@`.
+- **The board is rate-limited** at ten seconds between messages and sixty an hour, per player.
+  Firestore rules cannot count documents, so the counter is a document: a message is only accepted
+  as part of a transaction that also stamps `rateLimits/{uid}`, and the rules on that row are what
+  set the pace. Admins are exempt, deliberately — they can already delete the whole board.
+- **A Content-Security-Policy** is built per request in [`middleware.ts`](middleware.ts), with a
+  nonce for Next's inline bootstrap scripts. `style-src` still allows inline styles, because the
+  pages use React `style={{…}}` attributes throughout and CSP counts those as inline styles;
+  scripts, which are what matter, are nonce-gated.
 - **Profile pictures** are resized in the browser and stored as data URLs on the profile document,
   not in Cloud Storage. That keeps one access-control story instead of two, but it also means every
   approved player downloads every other player's picture with the league table — the rules cap each
@@ -162,4 +177,16 @@ npm run dev         # http://localhost:3000
 npm run typecheck   # tsc --noEmit
 npm run build       # production build
 npm run seed        # markets, instruments, settings
+npm run test:rules  # firestore.rules against the emulator
 ```
+
+### The rules tests
+
+`npm run test:rules` starts the Firestore emulator, runs
+[`tests/rules`](tests/rules) against `firestore.rules` verbatim, and shuts it down again. The
+emulator needs a Java runtime (`java -version` should work); `firebase-tools` downloads the rest by
+itself on the first run.
+
+Most of what they cover is the seal on the picks, because that is the one place where a rules bug is
+both silent and permanent — nobody gets an error when a pick leaks, and a pick that has been seen
+cannot be unseen.

@@ -1,10 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, limit, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  Timestamp,
+  collection,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
+import { chatReadMark, subscribeChatRead } from "@/lib/chatRead";
 import type {
   ChatMessage,
+  Contact,
   Instrument,
   LeagueSettings,
   Market,
@@ -274,6 +286,70 @@ export function useChat(enabled: boolean) {
   }, [enabled]);
 
   return { messages, loading, error };
+}
+
+/**
+ * How many messages have arrived since this browser last opened the
+ * board, capped — the badge only needs to say "some", and a query that
+ * counts four hundred of them to render "400" is wasted work.
+ */
+const UNREAD_CAP = 50;
+
+export function useChatUnread(uid: string | null, enabled: boolean): number {
+  const [mark, setMark] = useState<number | null>(null);
+  const [unread, setUnread] = useState(0);
+
+  // The mark is read on the client only. It lives in localStorage, which
+  // does not exist while the masthead is being rendered on the server, so
+  // starting at null keeps the first paint and the hydration agreeing
+  // that there is no badge yet.
+  useEffect(() => {
+    if (!uid || !enabled) {
+      setMark(null);
+      return;
+    }
+    const refresh = () => setMark(chatReadMark(uid));
+    refresh();
+    return subscribeChatRead(refresh);
+  }, [uid, enabled]);
+
+  useEffect(() => {
+    if (!uid || !enabled || mark === null) {
+      setUnread(0);
+      return;
+    }
+    const unsubscribe = onSnapshot(
+      query(
+        collection(firestore(), "chat"),
+        where("createdAt", ">", Timestamp.fromMillis(mark)),
+        orderBy("createdAt", "desc"),
+        limit(UNREAD_CAP),
+      ),
+      // Your own messages are not news to you.
+      (snap) => setUnread(snap.docs.filter((d) => (d.data() as ChatMessage).uid !== uid).length),
+      () => setUnread(0),
+    );
+    return unsubscribe;
+  }, [uid, enabled, mark]);
+
+  return unread;
+}
+
+/**
+ * Sign-in addresses, by uid. Admin-only: the rules refuse the listing to
+ * everyone else, so this is enabled from the admin panel and nowhere
+ * else.
+ */
+export function useContacts(enabled: boolean) {
+  const { data, loading, error } = useCollection<Contact>("contacts", enabled);
+
+  const emails = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const contact of data) map.set(contact.id, contact.email);
+    return map;
+  }, [data]);
+
+  return { emails, loading, error };
 }
 
 /** Countdown that re-renders once a second. */

@@ -30,8 +30,11 @@ export default function PendingPage() {
         </p>
       ) : (
         <>
+          {/* The address comes from the auth session rather than the
+              profile document: it is not stored on the profile any more,
+              and this is the one browser that is entitled to it anyway. */}
           <p className="secondary" style={{ marginTop: 12 }}>
-            You are signed in as <strong>{profile?.email}</strong>. An admin has to approve the
+            You are signed in as <strong>{user?.email}</strong>. An admin has to approve the
             account before you can see the league or submit picks. This page updates by itself the
             moment that happens.
           </p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { direction, displayName, formatPercent } from "@/lib/format";
 import type { SortDirection } from "@/lib/scoring";
@@ -181,6 +181,36 @@ export function PageHead({
       {children ? <p>{children}</p> : null}
     </div>
   );
+}
+
+/**
+ * Which column a table is sorted by, and which way.
+ *
+ * Clicking the active column flips it; clicking another one starts from
+ * the end of that column people actually want to see first — biggest
+ * number, or A first for names and positions. `ascFirst` names the
+ * columns that open ascending, and belongs at module scope in the caller
+ * so its identity is stable across renders.
+ */
+export function useColumnSort<T extends string>(initial: T, ascFirst: readonly T[]) {
+  const [sortBy, setSortBy] = useState<T>(initial);
+  const [direction, setDirection] = useState<SortDirection>(
+    ascFirst.includes(initial) ? "asc" : "desc",
+  );
+
+  const onSort = useCallback(
+    (column: T) => {
+      if (column === sortBy) {
+        setDirection((current) => (current === "desc" ? "asc" : "desc"));
+      } else {
+        setSortBy(column);
+        setDirection(ascFirst.includes(column) ? "asc" : "desc");
+      }
+    },
+    [sortBy, ascFirst],
+  );
+
+  return { sortBy, direction, onSort };
 }
 
 /**

@@ -115,18 +115,20 @@ async function main(): Promise<void> {
 
   const adminEmail = adminEmailArg();
   if (adminEmail) {
-    const matches = await db.collection("profiles").where("email", "==", adminEmail).get();
+    // Addresses live in contacts/, not on the profile — see the note in
+    // firestore.rules. The document id there is the uid, so one query
+    // finds the account and the profile is a direct write.
+    const matches = await db.collection("contacts").where("email", "==", adminEmail).get();
     if (matches.empty) {
       console.log(
-        `\n  No profile for ${adminEmail} yet. Sign in to the site once, then re-run:\n` +
+        `\n  No account for ${adminEmail} yet. Sign in to the site once, then re-run:\n` +
           `    npm run seed -- --admin ${adminEmail}`,
       );
     } else {
       for (const match of matches.docs) {
-        await match.ref.set(
-          { isAdmin: true, status: "approved", approvedAt: new Date() },
-          { merge: true },
-        );
+        await db
+          .doc(`profiles/${match.id}`)
+          .set({ isAdmin: true, status: "approved", approvedAt: new Date() }, { merge: true });
       }
       console.log(`  ${adminEmail} is now an approved admin`);
     }

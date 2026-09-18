@@ -17,7 +17,16 @@ export type RoundStatus = "open" | "live" | "settled";
 
 export type Profile = {
   uid: string;
-  email: string;
+  /**
+   * The part of the sign-in address before the @, and the fallback the
+   * league table shows when someone has not set a display name.
+   *
+   * The address itself is deliberately not here. Everyone approved reads
+   * every profile document, so anything on it is league-wide public;
+   * `contacts/{uid}` holds the address and is readable only by its owner
+   * and by admins. firestore.rules refuses a handle containing an @.
+   */
+  handle: string;
   alias: string | null;
   emoji: string;
   color: number;
@@ -38,6 +47,36 @@ export type Profile = {
 
 /** The hard ceiling the rules also enforce, in characters of data URL. */
 export const MAX_PHOTO_CHARS = 200_000;
+
+/**
+ * contacts/{uid} — the sign-in address, kept off the public profile.
+ *
+ * Readable by its owner and by admins only, so the approval queue can
+ * still show who is asking to join without the address being visible to
+ * the rest of the league.
+ */
+export type Contact = {
+  uid: string;
+  email: string;
+};
+
+/**
+ * rateLimits/{uid} — how fast one player may post to the board.
+ *
+ * Written in the same transaction as the message itself; the rules read
+ * it back with getAfter() and refuse the message if the pace is wrong.
+ * Not something any page renders.
+ */
+export type RateLimit = {
+  uid: string;
+  lastPostAt?: Instant;
+  windowStart?: Instant;
+  count: number;
+};
+
+/** Both halves of the posting limit the rules enforce. */
+export const CHAT_MIN_GAP_SECONDS = 10;
+export const CHAT_MAX_PER_HOUR = 60;
 
 /**
  * chat/{messageId} — the league's message board.

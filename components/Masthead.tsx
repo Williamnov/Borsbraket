@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useChatUnread } from "@/lib/hooks";
 
 const PLAYER_LINKS = [
   { href: "/league", label: "League" },
@@ -16,8 +17,14 @@ const PLAYER_LINKS = [
 
 export function Masthead() {
   const pathname = usePathname();
-  const { user, canPlay, isAdmin, loading, signOut } = useAuth();
+  const { user, profile, canPlay, isAdmin, loading, signOut } = useAuth();
   const [lifted, setLifted] = useState(false);
+
+  // Only for players, and only away from the board itself — standing on
+  // the page is what clears the mark, so a badge there would be a count
+  // of what you are already looking at.
+  const onChat = pathname === "/chat";
+  const unread = useChatUnread(profile?.uid ?? null, canPlay && !onChat);
 
   // The masthead earns a hairline shadow once the page has moved under it.
   useEffect(() => {
@@ -68,15 +75,28 @@ export function Masthead() {
         </Link>
 
         <nav className="nav">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={pathname === link.href ? "page" : undefined}
-            >
-              {link.label}
-            </Link>
-          ))}
+          {links.map((link) => {
+            const badge = link.href === "/chat" ? unread : 0;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+              >
+                {link.label}
+                {badge > 0 ? (
+                  <span className="nav-badge">
+                    {badge > 9 ? "9+" : badge}
+                    {/* The number alone reads as part of the label to a
+                        screen reader, so it says what it counts. */}
+                    <span className="visually-hidden">
+                      {` unread ${badge === 1 ? "message" : "messages"}`}
+                    </span>
+                  </span>
+                ) : null}
+              </Link>
+            );
+          })}
         </nav>
 
         {!loading &&

@@ -91,12 +91,16 @@ export function timeAgo(date: Date | null, now = new Date()): string {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** Player-facing name. Falls back to the local part of the email. */
+/**
+ * Player-facing name. Falls back to the handle — the part of the sign-in
+ * address before the @ — which is what the public profile carries. The
+ * address itself is not on that document and is not readable here.
+ */
 export function displayName(
-  profile: { alias?: string | null; email?: string } | null | undefined,
+  profile: { alias?: string | null; handle?: string } | null | undefined,
 ): string {
   if (!profile) return "Player";
   if (profile.alias && profile.alias.trim()) return profile.alias.trim();
-  if (profile.email) return profile.email.split("@")[0];
+  if (profile.handle && profile.handle.trim()) return profile.handle.trim();
   return "Player";
 }

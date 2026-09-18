@@ -10,9 +10,21 @@ import {
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase/client";
 import type { Profile } from "@/lib/types";
+
+/**
+ * The public half of an address: everything before the @.
+ *
+ * This is what the league table falls back to when a player has not
+ * chosen a display name. The address itself goes to contacts/{uid},
+ * which only its owner and admins can read.
+ */
+function handleFrom(email: string | null): string {
+  const local = (email ?? "").split("@")[0].trim();
+  return local ? local.slice(0, 64) : "player";
+}
 
 type AuthValue = {
   configured: boolean;
@@ -79,9 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // First sign-in: register as a pending player. The rules pin
         // status to 'pending' and isAdmin to false, so this cannot be
         // used to walk straight into the league.
-        void setDoc(ref, {
+        //
+        // Two documents, one batch. The profile is league-wide readable
+        // and carries only the handle; the address goes to contacts/{uid}
+        // where the rules check it against the one on the auth token. A
+        // batch means an admin never sees an approval request with no
+        // address attached to it.
+        const batch = writeBatch(firestore());
+        batch.set(ref, {
           uid: user.uid,
-          email: user.email ?? "",
+          handle: handleFrom(user.email),
           alias: null,
           emoji: "📈",
           color: 1,
@@ -90,7 +109,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: "pending",
           isAdmin: false,
           createdAt: serverTimestamp(),
-        })
+        });
+        // Only when there is one to record. The rules pin the value to
+        // the address on the auth token, so writing a placeholder for a
+        // provider that gave us none would fail the batch and leave the
+        // player without a profile at all.
+        if (user.email) {
+          batch.set(doc(firestore(), "contacts", user.uid), {
+            uid: user.uid,
+            email: user.email,
+          });
+        }
+
+        void batch
+          .commit()
           .catch(() => {
             /* A second tab won the race, or rules refused. The snapshot
                below reports whichever is true. */

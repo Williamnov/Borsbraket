@@ -90,6 +90,18 @@ service cloud.firestore {
               && data.photoUrl.matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'));
     }
 
+    // The public profile carries `handle` — the part of the address
+    // before the @ — and never the address itself. It is what the league
+    // table falls back to when someone has not set a display name, and it
+    // is checked here so a full address cannot be smuggled into a field
+    // every approved player can read.
+    function handleOk(data) {
+      return data.handle is string
+          && data.handle.size() > 0
+          && data.handle.size() <= 64
+          && !data.handle.matches('.*@.*');
+    }
+
     match /profiles/{uid} {
       // You can always read your own row, including while pending, so the
       // waiting-room page can explain itself. Approved players see the
@@ -102,18 +114,46 @@ service cloud.firestore {
                     && request.resource.data.uid == uid
                     && request.resource.data.status == 'pending'
                     && request.resource.data.isAdmin == false
+                    && handleOk(request.resource.data)
                     && photoOk(request.resource.data);
 
-      // Cosmetic self-edits only. Approval and admin rights cannot move.
+      // Cosmetic self-edits only. Approval, admin rights and the handle
+      // cannot move.
       allow update: if signedIn()
                     && request.auth.uid == uid
                     && request.resource.data.status == resource.data.status
                     && request.resource.data.isAdmin == resource.data.isAdmin
                     && request.resource.data.uid == resource.data.uid
-                    && request.resource.data.email == resource.data.email
+                    && request.resource.data.handle == resource.data.handle
                     && photoOk(request.resource.data);
 
       // Admins approve, reject and promote.
+      allow read, write: if isAdmin();
+    }
+
+    // ── Contact details ───────────────────────────────────────────────
+    // The email address lives here rather than on the profile, so being
+    // approved into the league no longer hands you every other player's
+    // address. Only the owner and admins can read a row.
+    //
+    // A top-level collection rather than profiles/{uid}/private/{doc}:
+    // the admin panel wants one listing of every address beside the
+    // approval queue, and a collection-group query for that needs its own
+    // index plus a second, looser rule block matching {path=**}. One
+    // collection with one rule is easier to be sure about.
+
+    match /contacts/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      // Pinned to the verified address on the auth token, so a player
+      // can only ever record their own, and cannot rewrite it to someone
+      // else's to confuse an approval.
+      allow create, update: if signedIn()
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['uid', 'email'])
+                    && request.resource.data.uid == uid
+                    && request.resource.data.email == request.auth.token.email;
+
       allow read, write: if isAdmin();
     }
 
@@ -138,6 +178,60 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // ── Posting rate ──────────────────────────────────────────────────
+    // Rules cannot count documents, so the counter is a document the
+    // poster keeps themselves. A message is only accepted as part of a
+    // transaction that also stamps rateLimits/{uid}: getAfter() reads the
+    // state that transaction would leave behind, and the rules on that
+    // document below are what actually set the pace.
+    //
+    // Two limits, because one is not enough. A minimum gap stops a script
+    // emptying its buffer into the board, and an hourly ceiling stops a
+    // patient script doing the same thing slowly.
+
+    function postStampedNow() {
+      return getAfter(/databases/$(database)/documents/rateLimits/$(request.auth.uid))
+             .data.lastPostAt == request.time;
+    }
+
+    match /rateLimits/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      // The first post of all: a fresh window with one message in it.
+      allow create: if isApproved()
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['uid', 'lastPostAt', 'windowStart', 'count'])
+                    && request.resource.data.uid == uid
+                    && request.resource.data.lastPostAt == request.time
+                    && request.resource.data.windowStart == request.time
+                    && request.resource.data.count == 1;
+
+      allow update: if isApproved()
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['uid', 'lastPostAt', 'windowStart', 'count'])
+                    && request.resource.data.uid == uid
+                    && request.resource.data.lastPostAt == request.time
+                    // At least ten seconds since the last message.
+                    && request.time > resource.data.lastPostAt + duration.value(10, 's')
+                    && (
+                         // Still inside the current hour: one more, up to sixty.
+                         (request.resource.data.windowStart == resource.data.windowStart
+                          && request.time < resource.data.windowStart + duration.value(1, 'h')
+                          && request.resource.data.count == resource.data.count + 1
+                          && request.resource.data.count <= 60)
+                         ||
+                         // The hour is over, so the count starts again.
+                         (request.time >= resource.data.windowStart + duration.value(1, 'h')
+                          && request.resource.data.windowStart == request.time
+                          && request.resource.data.count == 1)
+                       );
+
+      // No delete for players: deleting the row would reset the counter,
+      // which is the whole thing this document exists to prevent. An
+      // admin can clear one by hand if it ever needs it.
+      allow read, write: if isAdmin();
+    }
+
     // ── Message board ─────────────────────────────────────────────────
     // Approved players only, both to read and to post. A message is
     // written once and never edited: allowing updates would let an author
@@ -156,7 +250,8 @@ service cloud.firestore {
                     && request.resource.data.body.size() <= 2000
                     && (request.resource.data.parentId == null
                         || request.resource.data.parentId is string)
-                    && request.resource.data.createdAt == request.time;
+                    && request.resource.data.createdAt == request.time
+                    && postStampedNow();
 
       allow delete: if isApproved()
                     && (resource.data.uid == request.auth.uid || isAdmin());

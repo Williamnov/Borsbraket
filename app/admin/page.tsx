@@ -7,7 +7,7 @@ import { PriceGrid } from "@/components/admin/PriceGrid";
 import { RoundAdmin } from "@/components/admin/RoundAdmin";
 import { UniverseAdmin } from "@/components/admin/UniverseAdmin";
 import { Empty, PageHead, RequirePlayer } from "@/components/ui";
-import { useLeagueBase, useRoundPicks, useRoundPrices } from "@/lib/hooks";
+import { useContacts, useLeagueBase, useRoundPicks, useRoundPrices } from "@/lib/hooks";
 
 export default function AdminPage() {
   return (
@@ -20,6 +20,10 @@ export default function AdminPage() {
 function AdminPanels() {
   const { profile } = useAuth();
   const { profiles, rounds, instruments, instrumentMap, markets, loading } = useLeagueBase(true);
+  // Only this page reads contacts/. The rules refuse the listing to
+  // anyone who is not an admin, and RequirePlayer has already redirected
+  // them by the time this runs.
+  const { emails } = useContacts(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,7 +49,7 @@ function AdminPanels() {
       </PageHead>
 
       <div className="stack">
-        <Approvals profiles={profiles} meUid={profile?.uid ?? ""} />
+        <Approvals profiles={profiles} emails={emails} meUid={profile?.uid ?? ""} />
 
         <RoundAdmin rounds={rounds} selectedId={selectedId} onSelect={setSelectedId} />
 

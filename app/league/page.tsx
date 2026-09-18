@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import {
   Empty,
@@ -11,17 +11,15 @@ import {
   SortHeader,
   Value,
   WeekBars,
+  useColumnSort,
 } from "@/components/ui";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
-import {
-  buildSeason,
-  scoreRound,
-  sortSeason,
-  type SeasonSort,
-  type SortDirection,
-} from "@/lib/scoring";
+import { buildSeason, scoreRound, sortSeason, type SeasonSort } from "@/lib/scoring";
 import { displayName, shortMonth } from "@/lib/format";
 import type { ScoredEntry } from "@/lib/types";
+
+/** Columns whose first click should read small-to-large. */
+const ASC_FIRST: readonly SeasonSort[] = ["player"];
 
 export default function LeaguePage() {
   return (
@@ -34,23 +32,7 @@ export default function LeaguePage() {
 function LeagueTable() {
   const { profile } = useAuth();
   const { profiles, profileMap, rounds, loading } = useLeagueBase(true);
-  const [sortBy, setSortBy] = useState<SeasonSort>("points");
-  const [direction, setDirection] = useState<SortDirection>("desc");
-
-  // Clicking the active column flips it; clicking another one starts from
-  // the end of that column that people actually want to see first —
-  // biggest number, or A first for names.
-  const onSort = useCallback(
-    (column: SeasonSort) => {
-      if (column === sortBy) {
-        setDirection((d) => (d === "desc" ? "asc" : "desc"));
-      } else {
-        setSortBy(column);
-        setDirection(column === "player" ? "asc" : "desc");
-      }
-    },
-    [sortBy],
-  );
+  const { sortBy, direction, onSort } = useColumnSort<SeasonSort>("points", ASC_FIRST);
 
   const settledIds = useMemo(
     () => rounds.filter((r) => r.status === "settled").map((r) => r.id),
