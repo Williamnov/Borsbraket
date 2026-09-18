@@ -12,7 +12,7 @@ export default function PendingPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) router.replace("/login");
-    else if (canPlay) router.replace("/league");
+    else if (canPlay) router.replace("/");
   }, [loading, user, canPlay, router]);
 
   if (loading) return <div className="empty">Loading…</div>;

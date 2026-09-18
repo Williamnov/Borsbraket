@@ -36,14 +36,14 @@ export default function LoginPage() {
     signInWithEmailLink(auth, address, window.location.href)
       .then(() => {
         window.localStorage.removeItem(STORAGE_KEY);
-        router.replace("/league");
+        router.replace("/");
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setBusy(false));
   }, [configured, router]);
 
   useEffect(() => {
-    if (!loading && user) router.replace("/league");
+    if (!loading && user) router.replace("/");
   }, [loading, user, router]);
 
   async function sendLink(event: React.FormEvent) {
@@ -70,7 +70,7 @@ export default function LoginPage() {
     setError(null);
     try {
       await signInWithPopup(firebaseAuth(), new GoogleAuthProvider());
-      router.replace("/league");
+      router.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
     } finally {

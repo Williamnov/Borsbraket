@@ -208,22 +208,15 @@ a:hover { text-decoration: underline; }
 .brand:hover { text-decoration: none; }
 
 /* The favicon mark, repeated in the masthead so the tab and the page
-   agree with each other. */
+   agree with each other. It inherits the brand's colour. */
 .brand-mark {
-  display: flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 15px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  color: var(--ink-2);
+  transition: color 0.16s ease;
 }
-.brand-mark i {
-  display: block;
-  width: 3px;
-  border-radius: 1.5px;
-  background: var(--accent);
-}
-.brand-mark i:nth-child(1) { height: 6px; opacity: 0.4; }
-.brand-mark i:nth-child(2) { height: 10px; opacity: 0.68; }
-.brand-mark i:nth-child(3) { height: 15px; }
+.brand:hover .brand-mark { color: var(--accent); }
 
 .nav {
   display: flex;

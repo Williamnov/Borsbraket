@@ -39,12 +39,31 @@ export function Masthead() {
   return (
     <header className={`masthead${lifted ? " is-lifted" : ""}`}>
       <div className="masthead-inner">
-        <Link href={canPlay ? "/league" : "/"} className="brand">
-          <span className="brand-mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
+        <Link href="/" className="brand">
+          {/* The five diamonds from app/icon.png — five picks a month —
+              redrawn inline so the tab and the page carry the same mark
+              and it takes its colour from the text beside it. */}
+          <svg className="brand-mark" viewBox="0 0 512 512" aria-hidden="true">
+            <g fill="none" stroke="currentColor" strokeWidth="26">
+              {[
+                [170, 180],
+                [341, 180],
+                [85, 325],
+                [256, 325],
+                [427, 325],
+              ].map(([cx, cy]) => (
+                <rect
+                  key={`${cx}-${cy}`}
+                  x={cx - 53}
+                  y={cy - 53}
+                  width="106"
+                  height="106"
+                  rx="14"
+                  transform={`rotate(45 ${cx} ${cy})`}
+                />
+              ))}
+            </g>
+          </svg>
           BörsBråket
         </Link>
 

@@ -25,7 +25,12 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BörsBråket",
+  // Each route names itself in a thin layout; this frames it, so the tab
+  // reads "BörsBråket - League" rather than just the app name everywhere.
+  title: {
+    default: "BörsBråket",
+    template: "BörsBråket - %s",
+  },
   description:
     "A monthly stock-picking league. Five stocks a month, prices checked every week, one table that settles the argument.",
   // A private league. Keeping it out of search results costs nothing.

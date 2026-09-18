@@ -141,7 +141,7 @@ export function RequirePlayer({ children, admin }: { children: ReactNode; admin?
     if (loading || !configured) return;
     if (!user) router.replace("/login");
     else if (!canPlay) router.replace("/pending");
-    else if (admin && !isAdmin) router.replace("/league");
+    else if (admin && !isAdmin) router.replace("/");
   }, [loading, configured, user, canPlay, isAdmin, admin, router]);
 
   if (!configured) {
