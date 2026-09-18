@@ -1,0 +1,86 @@
+name: CI
+
+# The recurring failure mode in this repository is code that has never
+# been compiled reaching main. This ends that permanently.
+#
+# It does NOT catch everything: the CSP that blanked the site in
+# September compiled cleanly and deployed cleanly, because it was a
+# runtime mistake about where nonces come from. See smoke.yml for the
+# check that would have caught that one.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # The Firebase web config is read at build time. None of these are
+      # secrets — a web API key identifies a project and grants nothing,
+      # and firestore.rules is what actually refuses a write — but the
+      # build wants them present, so they are filled with placeholders
+      # rather than wired to the real project.
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-placeholder
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "0"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:0:web:0"
+
+  unit:
+    name: Scoring tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # No emulator and no network: these are pure functions.
+      - run: npm test
+
+  rules:
+    name: Firestore rules tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # The Firestore emulator is a Java program. Without a JRE the
+      # tests do not fail, they refuse to start — which reads like a
+      # passing run if nobody looks.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - run: npm ci
+
+      - run: npm run test:rules

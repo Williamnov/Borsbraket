@@ -1,17 +1,16 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Only the rules tests use this. They talk to the Firestore emulator
- * over the network, so they are slower than a unit test and they must
- * not run in parallel against one shared emulator — two files clearing
- * the database from under each other is not a failure worth debugging.
+ * The fast tests: pure functions, no emulator, no network.
+ *
+ * Deliberately a separate config from the rules tests. Those need the
+ * Firestore emulator wrapped around them, and a single config covering
+ * both means `npm test` fails for anyone without a JRE — which trains
+ * people to ignore it.
  */
 export default defineConfig({
   test: {
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/unit/**/*.test.ts"],
     environment: "node",
-    testTimeout: 20_000,
-    hookTimeout: 20_000,
-    fileParallelism: false,
   },
 });

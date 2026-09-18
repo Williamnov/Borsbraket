@@ -1,0 +1,49 @@
+name: Smoke
+
+# Runs against the deployed site, because the outage this was written for
+# passed every check that runs before a deploy: it compiled, it built, it
+# deployed, and it served 200s with every inline script blocked.
+#
+# Vercel records a GitHub deployment when it finishes, so this fires on
+# the real thing rather than guessing at a delay. The daily run is there
+# because a site can also break without anyone pushing — an expired key,
+# a revoked service account, a Firebase project change.
+
+on:
+  deployment_status:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch:
+    inputs:
+      url:
+        description: Site to check
+        required: false
+        default: https://borsbraket.vercel.app
+
+jobs:
+  smoke:
+    name: Check the deployed site
+    # A deployment_status event fires for every state change, so this
+    # waits for the successful one. Preview deploys are checked too, at
+    # their own URL — a preview that is blank is worth knowing about
+    # before it becomes production.
+    if: >-
+      github.event_name != 'deployment_status' ||
+      github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # No npm ci: the script is plain node with global fetch and no
+      # dependencies, so there is nothing to install.
+      - name: Smoke
+        run: node scripts/smoke.mjs "$URL"
+        env:
+          URL: >-
+            ${{ github.event.inputs.url
+                || github.event.deployment_status.environment_url
+                || 'https://borsbraket.vercel.app' }}

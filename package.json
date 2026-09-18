@@ -10,7 +10,9 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "test:rules": "firebase emulators:exec --only firestore \"vitest run\""
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run --config vitest.rules.config.ts\"",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "firebase": "^11.0.2",
