@@ -7,11 +7,13 @@ import {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { doc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase/client";
+import { getHint, getServerHint, setHint, subscribeHint } from "@/lib/authHint";
 import type { Profile } from "@/lib/types";
 
 /**
@@ -134,21 +136,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [configured, user]);
 
   const signOut = useCallback(async () => {
+    // Clear the hint first: if the sign-out round trip is slow, the next
+    // paint should already have stopped offering the league.
+    setHint(null);
     if (configured) await fbSignOut(firebaseAuth());
   }, [configured]);
 
-  const value = useMemo<AuthValue>(() => {
+  const hint = useSyncExternalStore(subscribeHint, getHint, getServerHint);
+  const resolved = authReady && profileReady;
+
+  // Remember the answer for the next visit, once it is actually known.
+  useEffect(() => {
+    if (!resolved) return;
     const isAdmin = profile?.isAdmin === true;
+    const canPlay = isAdmin || profile?.status === "approved";
+    setHint(user ? { canPlay, isAdmin } : null);
+  }, [resolved, user, profile]);
+
+  const value = useMemo<AuthValue>(() => {
+    const realIsAdmin = profile?.isAdmin === true;
+    const realCanPlay = realIsAdmin || profile?.status === "approved";
+
     return {
       configured,
-      loading: !authReady || !profileReady,
+      // Still reports the truth: anything that needs certainty rather
+      // than a good guess — RequirePlayer, the admin panel — waits on it.
+      loading: !resolved,
       user,
       profile,
-      isAdmin,
-      canPlay: isAdmin || profile?.status === "approved",
+      // Optimistic until the real answer lands, so the first frame can
+      // show the right thing instead of an empty gap. A stale hint costs
+      // a redirect, never access: the rules are unmoved by it.
+      isAdmin: resolved ? realIsAdmin : (hint?.isAdmin ?? false),
+      canPlay: resolved ? realCanPlay : (hint?.canPlay ?? false),
       signOut,
     };
-  }, [configured, authReady, profileReady, user, profile, signOut]);
+  }, [configured, resolved, user, profile, hint, signOut]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

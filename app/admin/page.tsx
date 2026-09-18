@@ -7,7 +7,8 @@ import { PriceGrid } from "@/components/admin/PriceGrid";
 import { RoundAdmin } from "@/components/admin/RoundAdmin";
 import { UniverseAdmin } from "@/components/admin/UniverseAdmin";
 import { Empty, PageHead, RequirePlayer } from "@/components/ui";
-import { useContacts, useLeagueBase, useRoundPicks, useRoundPrices } from "@/lib/hooks";
+import { useContacts, useRoundPicks, useRoundPrices } from "@/lib/hooks";
+import { useLeagueBase, useUniverse } from "@/components/LeagueProvider";
 
 export default function AdminPage() {
   return (
@@ -19,7 +20,10 @@ export default function AdminPage() {
 
 function AdminPanels() {
   const { profile } = useAuth();
-  const { profiles, rounds, instruments, instrumentMap, markets, loading } = useLeagueBase(true);
+  const { profiles, rounds, loading } = useLeagueBase();
+  // Asking for the universe is what starts those listeners; the admin
+  // panel is one of the few pages that genuinely needs the ticker list.
+  const { instruments, instrumentMap, markets, loading: universeLoading } = useUniverse();
   // Only this page reads contacts/. The rules refuse the listing to
   // anyone who is not an admin, and RequirePlayer has already redirected
   // them by the time this runs.
@@ -40,7 +44,7 @@ function AdminPanels() {
 
   const round = rounds.find((r) => r.id === selectedId) ?? null;
 
-  if (loading) return <Empty>Loading the admin panel…</Empty>;
+  if (loading || universeLoading) return <Empty>Loading the admin panel…</Empty>;
 
   return (
     <>

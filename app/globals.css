@@ -174,13 +174,35 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.88);
   backdrop-filter: saturate(160%) blur(10px);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  transition:
+    box-shadow 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* Set by the masthead itself once the page has scrolled under it. */
 .masthead.is-lifted {
   box-shadow: 0 1px 12px rgba(16, 22, 28, 0.07);
   border-color: var(--line-strong);
+}
+
+/* Out of the way while reading down a long table, back on the first
+   upward scroll. Only the bar moves — it stays sticky, so nothing
+   below it reflows. */
+.masthead.is-hidden {
+  transform: translateY(-100%);
+}
+
+/* Someone who has asked for less motion gets the bar simply staying
+   put rather than a jump: hiding it without the slide is worse than
+   not hiding it. */
+@media (prefers-reduced-motion: reduce) {
+  .masthead {
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .masthead.is-hidden {
+    transform: none;
+  }
 }
 
 .masthead-inner {

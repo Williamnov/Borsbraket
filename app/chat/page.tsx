@@ -7,7 +7,8 @@ import { Avatar, Empty, PageHead, RequirePlayer, Reveal } from "@/components/ui"
 import { firestore } from "@/lib/firebase/client";
 import { postChatMessage } from "@/lib/chat";
 import { markChatRead } from "@/lib/chatRead";
-import { useChat, useLeagueBase } from "@/lib/hooks";
+import { useChat } from "@/lib/hooks";
+import { useLeagueBase } from "@/components/LeagueProvider";
 import { displayName, timeAgo } from "@/lib/format";
 import {
   CHAT_MIN_GAP_SECONDS,
@@ -29,7 +30,7 @@ type Thread = { root: ChatMessage; replies: ChatMessage[]; orphaned: boolean };
 
 function Board() {
   const { profile, isAdmin } = useAuth();
-  const { profileMap } = useLeagueBase(true);
+  const { profileMap } = useLeagueBase();
   const { messages, loading, error } = useChat(true);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   // The rules enforce the gap between messages; this only stops the

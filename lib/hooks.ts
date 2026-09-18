@@ -6,6 +6,7 @@ import {
   collection,
   doc,
   getDocs,
+  getDocsFromCache,
   limit,
   onSnapshot,
   orderBy,
@@ -14,22 +15,18 @@ import {
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
 import { chatReadMark, subscribeChatRead } from "@/lib/chatRead";
-import type {
-  ChatMessage,
-  Contact,
-  Instrument,
-  LeagueSettings,
-  Market,
-  PicksDoc,
-  PriceDoc,
-  Profile,
-  Round,
-} from "@/lib/types";
+import type { ChatMessage, Contact, PicksDoc, PriceDoc } from "@/lib/types";
 
 type Loadable<T> = { data: T; loading: boolean; error: string | null };
 
-/** Live view of a whole collection, keyed by document id. */
-function useCollection<T>(path: string, enabled: boolean): Loadable<(T & { id: string })[]> {
+/**
+ * Live view of a whole collection, keyed by document id.
+ *
+ * Exported for LeagueProvider, which is the only thing that should be
+ * subscribing to the shared collections. Anything calling this directly
+ * from a page opens a second listener for data the provider already has.
+ */
+export function useCollection<T>(path: string, enabled: boolean): Loadable<(T & { id: string })[]> {
   const [data, setData] = useState<(T & { id: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,53 +56,12 @@ function useCollection<T>(path: string, enabled: boolean): Loadable<(T & { id: s
   return { data, loading, error };
 }
 
-/** Everything the league pages need, live. */
-export function useLeagueBase(enabled: boolean) {
-  const profiles = useCollection<Profile>("profiles", enabled);
-  const rounds = useCollection<Round>("rounds", enabled);
-  const instruments = useCollection<Instrument>("instruments", enabled);
-  const markets = useCollection<Market>("markets", enabled);
-  const settings = useCollection<LeagueSettings>("settings", enabled);
-
-  const sortedRounds = useMemo(
-    () => [...rounds.data].sort((a, b) => a.id.localeCompare(b.id)),
-    [rounds.data],
-  );
-
-  const profileMap = useMemo(() => {
-    const map = new Map<string, Profile>();
-    for (const p of profiles.data) map.set(p.id, { ...p, uid: p.id });
-    return map;
-  }, [profiles.data]);
-
-  const instrumentMap = useMemo(() => {
-    const map = new Map<string, Instrument>();
-    for (const i of instruments.data) map.set(i.id, i);
-    return map;
-  }, [instruments.data]);
-
-  const league = useMemo<LeagueSettings>(() => {
-    const found = settings.data.find((s) => s.id === "league");
-    return {
-      leagueName: found?.leagueName ?? "BörsBråket",
-      picksPerRound: found?.picksPerRound ?? 5,
-      minMarketCapMusd: found?.minMarketCapMusd ?? 300,
-    };
-  }, [settings.data]);
-
-  return {
-    profiles: profiles.data.map((p) => ({ ...p, uid: p.id })),
-    profileMap,
-    rounds: sortedRounds,
-    instruments: instruments.data,
-    instrumentMap,
-    markets: [...markets.data].sort((a, b) => a.sortOrder - b.sortOrder),
-    settings: league,
-    loading:
-      profiles.loading || rounds.loading || instruments.loading || markets.loading || settings.loading,
-    error: profiles.error ?? rounds.error ?? instruments.error ?? markets.error ?? settings.error,
-  };
-}
+/*
+ * useLeagueBase used to live here and each page called it with `true`,
+ * which opened five subscriptions per page. It now lives in
+ * components/LeagueProvider.tsx as a single set of listeners mounted
+ * once in the root layout — see the note there for why.
+ */
 
 /** Live prices for one round. */
 export function useRoundPrices(roundId: string | null) {
@@ -205,14 +161,38 @@ export function useRoundBundles(roundIds: string[], enabled: boolean) {
     }
     setLoading(true);
 
+    /**
+     * Cache first, server only if it misses.
+     *
+     * Every caller passes settled rounds, and a settled round's picks
+     * and prices never change again — so once they are on disk there is
+     * no reason to buy them a second time. Without this, the league,
+     * history and profile pages each re-read every month of the season
+     * on every visit, which is most of the way to a daily quota on its
+     * own.
+     *
+     * An empty collection looks the same as a cache miss here, so a
+     * month nobody submitted for is re-checked against the server. That
+     * is one wasted query against a collection with nothing in it.
+     */
+    const load = async (db: ReturnType<typeof firestore>, path: string) => {
+      try {
+        const cached = await getDocsFromCache(collection(db, path));
+        if (!cached.empty) return cached;
+      } catch {
+        // No persistent cache in this browser; fall through to the server.
+      }
+      return getDocs(collection(db, path));
+    };
+
     (async () => {
       const db = firestore();
       const next = new Map<string, RoundBundle>();
       await Promise.all(
         key.split(",").map(async (roundId) => {
           const [pickSnap, priceSnap] = await Promise.all([
-            getDocs(collection(db, `rounds/${roundId}/picks`)),
-            getDocs(collection(db, `rounds/${roundId}/prices`)),
+            load(db, `rounds/${roundId}/picks`),
+            load(db, `rounds/${roundId}/prices`),
           ]);
           const prices = new Map<string, PriceDoc>();
           for (const d of priceSnap.docs) {

@@ -29,7 +29,7 @@ const POINTS = [
  * like it did nothing. Now it stays put and simply points you onward.
  */
 export default function LandingPage() {
-  const { canPlay, loading } = useAuth();
+  const { canPlay } = useAuth();
 
   return (
     <div className="stack" style={{ paddingTop: 56 }}>
@@ -42,17 +42,21 @@ export default function LandingPage() {
           start of the month, prices are checked once a week, and the month&rsquo;s return decides
           who takes the points.
         </p>
+        {/* No loading gate. Waiting for the real answer meant the primary
+            button appeared a few hundred milliseconds late and shoved the
+            row sideways; useAuth now answers immediately from the last
+            visit's cached hint and corrects itself if it was wrong. The
+            worst case is a link that redirects to sign-in. */}
         <div className="row" style={{ marginTop: 28 }}>
-          {!loading &&
-            (canPlay ? (
-              <Link href="/league" className="button primary">
-                Go to the league
-              </Link>
-            ) : (
-              <Link href="/login" className="button primary">
-                Sign in to play
-              </Link>
-            ))}
+          {canPlay ? (
+            <Link href="/league" className="button primary">
+              Go to the league
+            </Link>
+          ) : (
+            <Link href="/login" className="button primary">
+              Sign in to play
+            </Link>
+          )}
           <Link href="/instructions" className="button">
             Read the rules
           </Link>

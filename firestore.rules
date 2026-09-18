@@ -227,9 +227,17 @@ service cloud.firestore {
                        );
 
       // No delete for players: deleting the row would reset the counter,
-      // which is the whole thing this document exists to prevent. An
-      // admin can clear one by hand if it ever needs it.
-      allow read, write: if isAdmin();
+      // which is the whole thing this document exists to prevent.
+      //
+      // Admins get read and delete, deliberately not write. A blanket
+      // write here was meant to allow a manual reset and took the
+      // ceiling off as a side effect: an admin could stamp their own
+      // counter to anything and post as fast as they liked, because the
+      // chat rule only checks that the counter was written, not that it
+      // was written honestly. Delete is enough for a reset — the next
+      // message recreates the row through the create rule above, which
+      // starts a fresh window at one.
+      allow read, delete: if isAdmin();
     }
 
     // ── Message board ─────────────────────────────────────────────────

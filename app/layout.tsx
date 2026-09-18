@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Familjen_Grotesk, IBM_Plex_Mono, Public_Sans } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
+import { LeagueProvider } from "@/components/LeagueProvider";
 import { Masthead } from "@/components/Masthead";
 import { SiteFooter } from "@/components/SiteFooter";
 import "./globals.css";
@@ -47,9 +48,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <style>{`.reveal { opacity: 1 !important; transform: none !important; }`}</style>
         </noscript>
         <AuthProvider>
-          <Masthead />
-          <main className="shell">{children}</main>
-          <SiteFooter />
+          {/* One set of Firestore listeners for the whole session, rather
+              than five per page. See components/LeagueProvider.tsx. */}
+          <LeagueProvider>
+            <Masthead />
+            <main className="shell">{children}</main>
+            <SiteFooter />
+          </LeagueProvider>
         </AuthProvider>
       </body>
     </html>

@@ -13,7 +13,8 @@ import {
   WeekBars,
   useColumnSort,
 } from "@/components/ui";
-import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
+import { useRoundBundles } from "@/lib/hooks";
+import { useLeagueBase } from "@/components/LeagueProvider";
 import { buildSeason, scoreRound, sortSeason, type SeasonSort } from "@/lib/scoring";
 import { displayName, shortMonth } from "@/lib/format";
 import type { ScoredEntry } from "@/lib/types";
@@ -31,7 +32,7 @@ export default function LeaguePage() {
 
 function LeagueTable() {
   const { profile } = useAuth();
-  const { profiles, profileMap, rounds, loading } = useLeagueBase(true);
+  const { profiles, profileMap, rounds, loading } = useLeagueBase();
   const { sortBy, direction, onSort } = useColumnSort<SeasonSort>("points", ASC_FIRST);
 
   const settledIds = useMemo(

@@ -12,7 +12,8 @@ import {
   Value,
   useColumnSort,
 } from "@/components/ui";
-import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
+import { useRoundBundles } from "@/lib/hooks";
+import { useLeagueBase, useUniverse } from "@/components/LeagueProvider";
 import { instrumentReturn, scoreRound, sortEntries, type EntrySort } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
 import type { Profile, ScoredEntry } from "@/lib/types";
@@ -30,7 +31,8 @@ export default function HistoryPage() {
 
 function History() {
   const { profile } = useAuth();
-  const { profileMap, rounds, instruments, loading } = useLeagueBase(true);
+  const { profileMap, rounds, loading } = useLeagueBase();
+  const { instruments, loading: universeLoading } = useUniverse();
 
   const settled = useMemo(
     () => rounds.filter((r) => r.status === "settled").sort((a, b) => b.id.localeCompare(a.id)),
@@ -70,7 +72,7 @@ function History() {
     return { best, worst, bestMonth };
   }, [scoredByRound]);
 
-  if (loading || bundlesLoading) return <Empty>Loading history…</Empty>;
+  if (loading || universeLoading || bundlesLoading) return <Empty>Loading history…</Empty>;
 
   if (settled.length === 0) {
     return (

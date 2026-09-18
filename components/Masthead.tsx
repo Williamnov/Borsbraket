@@ -19,6 +19,7 @@ export function Masthead() {
   const pathname = usePathname();
   const { user, profile, canPlay, isAdmin, loading, signOut } = useAuth();
   const [lifted, setLifted] = useState(false);
+  const [hidden, setHidden] = useState(false);
 
   // Only for players, and only away from the board itself — standing on
   // the page is what clears the mark, so a badge there would be a count
@@ -26,12 +27,48 @@ export function Masthead() {
   const onChat = pathname === "/chat";
   const unread = useChatUnread(profile?.uid ?? null, canPlay && !onChat);
 
-  // The masthead earns a hairline shadow once the page has moved under it.
+  /**
+   * The masthead earns a hairline shadow once the page has moved under
+   * it, and gets out of the way when you scroll down.
+   *
+   * Three things keep the hiding from being annoying. It only starts
+   * below REVEAL_AT, so short pages and the top of long ones never lose
+   * the bar. It ignores movements under DEADBAND, so a trackpad's jitter
+   * or the rubber-band at the end of a page does not flicker it. And any
+   * upward scroll at all brings it straight back, which is what someone
+   * reaching for the nav is already doing.
+   *
+   * The reads are batched into a rAF because scroll fires far more often
+   * than the screen repaints, and touching scrollY forces layout.
+   */
   useEffect(() => {
-    const onScroll = () => setLifted(window.scrollY > 4);
-    onScroll();
+    const REVEAL_AT = 140;
+    const DEADBAND = 6;
+    let last = window.scrollY;
+    let frame = 0;
+
+    const measure = () => {
+      frame = 0;
+      const y = window.scrollY;
+      const delta = y - last;
+      setLifted(y > 4);
+
+      if (Math.abs(delta) > DEADBAND) {
+        setHidden(delta > 0 && y > REVEAL_AT);
+        last = y;
+      }
+    };
+
+    const onScroll = () => {
+      if (frame === 0) frame = window.requestAnimationFrame(measure);
+    };
+
+    measure();
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   // The Admin link is only built for admins, and /admin redirects anyone
@@ -44,7 +81,9 @@ export function Masthead() {
     : [{ href: "/instructions", label: "How it works" }];
 
   return (
-    <header className={`masthead${lifted ? " is-lifted" : ""}`}>
+    <header
+      className={`masthead${lifted ? " is-lifted" : ""}${hidden ? " is-hidden" : ""}`}
+    >
       <div className="masthead-inner">
         <Link href="/" className="brand">
           {/* The five diamonds from app/icon.png — five picks a month —

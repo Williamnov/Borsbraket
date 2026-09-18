@@ -16,7 +16,8 @@ import {
   WeekBars,
   useColumnSort,
 } from "@/components/ui";
-import { useCountdown, useLeagueBase, useMyPicks, useRoundPicks, useRoundPrices, useSubmissions } from "@/lib/hooks";
+import { useCountdown, useMyPicks, useRoundPicks, useRoundPrices, useSubmissions } from "@/lib/hooks";
+import { useLeagueBase, useUniverse } from "@/components/LeagueProvider";
 import { instrumentReturn, roundPhase, scoreRound, sortEntries, weeklyPath, type EntrySort } from "@/lib/scoring";
 import { displayName, formatDate, formatPercent, monthLabel } from "@/lib/format";
 import { toDate } from "@/lib/types";
@@ -34,8 +35,8 @@ export default function MonthPage() {
 
 function MonthView() {
   const { profile } = useAuth();
-  const { profiles, profileMap, rounds, instruments, markets, settings, loading } =
-    useLeagueBase(true);
+  const { profiles, profileMap, rounds, settings, loading } = useLeagueBase();
+  const { instruments, markets, loading: universeLoading } = useUniverse();
 
   const round = useMemo(() => {
     const unsettled = rounds.filter((r) => r.status !== "settled");
@@ -73,7 +74,9 @@ function MonthView() {
     [entries, sortBy, direction, profileMap],
   );
 
-  if (loading) return <Empty>Loading the month…</Empty>;
+  // The universe arrives after the core data, because asking for it is
+  // what starts its listeners. PickEditor needs it, so wait for both.
+  if (loading || universeLoading) return <Empty>Loading the month…</Empty>;
   if (!round || !phase) {
     return (
       <>

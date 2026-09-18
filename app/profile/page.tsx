@@ -5,7 +5,8 @@ import { doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, Panel, RequirePlayer, Reveal, Value } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
-import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
+import { useRoundBundles } from "@/lib/hooks";
+import { useLeagueBase } from "@/components/LeagueProvider";
 import { buildSeason, roundPhase, scoreRound } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
 import { MAX_PHOTO_CHARS, type Round, type ScoredEntry } from "@/lib/types";
@@ -66,7 +67,7 @@ export default function ProfilePage() {
 
 function ProfileEditor() {
   const { user, profile } = useAuth();
-  const { profiles, rounds, loading } = useLeagueBase(true);
+  const { profiles, rounds, loading } = useLeagueBase();
 
   const [alias, setAlias] = useState(profile?.alias ?? "");
   const [motto, setMotto] = useState(profile?.motto ?? "");
