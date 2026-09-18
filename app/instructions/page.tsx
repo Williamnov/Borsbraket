@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "How it works · BörsBråket",
+  title: "How it works",
   description: "The rules of the league: picking, scoring, eligible markets and the weekly price checkpoints.",
 };
 

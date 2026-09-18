@@ -25,7 +25,7 @@ export function Masthead() {
   return (
     <header className="masthead">
       <div className="masthead-inner">
-        <Link href={canPlay ? "/league" : "/"} className="brand">
+        <Link href="/" className="brand">
           BörsBråket
         </Link>
 

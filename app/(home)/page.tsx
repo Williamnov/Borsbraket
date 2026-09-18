@@ -1,17 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
 
+/**
+ * The home screen, and what the masthead name links to. It used to bounce
+ * approved players straight to /league, which made clicking the name look
+ * like it did nothing. Now it stays put and simply points you onward.
+ */
 export default function LandingPage() {
   const { canPlay, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && canPlay) router.replace("/league");
-  }, [loading, canPlay, router]);
 
   return (
     <div className="stack" style={{ paddingTop: 48 }}>
@@ -23,9 +21,16 @@ export default function LandingPage() {
           who takes the points.
         </p>
         <div className="row" style={{ marginTop: 24 }}>
-          <Link href="/login" className="button primary">
-            Sign in to play
-          </Link>
+          {!loading &&
+            (canPlay ? (
+              <Link href="/league" className="button primary">
+                Go to the league
+              </Link>
+            ) : (
+              <Link href="/login" className="button primary">
+                Sign in to play
+              </Link>
+            ))}
           <Link href="/instructions" className="button">
             Read the rules
           </Link>
