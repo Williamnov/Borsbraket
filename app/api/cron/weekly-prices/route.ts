@@ -4,7 +4,8 @@ import { serverEnv } from "@/lib/env";
 import { getPriceProvider } from "@/lib/prices";
 import { checkpointDueDates, currentCheckpoint, isPricingOpen } from "@/lib/scoring";
 import { MARKET_MIC } from "@/lib/universe";
-import type { Round } from "@/lib/types";
+import { SYSTEM_UID, toDate, type Round } from "@/lib/types";
+import { monthLabel } from "@/lib/format";
 import type { PriceRequest, Quote } from "@/lib/prices/types";
 
 export const runtime = "nodejs";
@@ -81,10 +82,8 @@ type RoundPlan = {
  * Reads are shared across rounds: the instruments collection is fetched
  * once however many months are open at the same time.
  */
-async function buildPlan(db: Db, now: Date): Promise<RoundPlan[]> {
-  const roundsSnap = await db.collection("rounds").get();
-  const open = roundsSnap.docs
-    .map((d) => ({ ...(d.data() as Round), id: d.id }))
+async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[]> {
+  const open = rounds
     .filter((r) => r.status !== "settled" && isPricingOpen(r, now))
     .sort((a, b) => a.id.localeCompare(b.id));
 
@@ -228,6 +227,76 @@ async function writeQuotes(
   };
 }
 
+/**
+ * Tell the board when a month opens and when it seals.
+ *
+ * Missing the lock used to be silent, which is a poor way to run a
+ * competition whose whole premise is that picks are final at a moment
+ * everyone knew about. Now the board says so, at both ends.
+ *
+ * Both messages are written through the Admin SDK as SYSTEM_UID. A
+ * signed-in client cannot forge one: the chat rule pins the author to
+ * the auth token, and there is no account with that uid.
+ *
+ * Each announcement is flagged on the round, so a job that runs every
+ * day says each thing exactly once. The flag is set in the same batch as
+ * the message, so a crash between them cannot leave the league
+ * permanently un-notified or permanently re-notified.
+ */
+async function announce(db: Db, rounds: Round[], now: Date): Promise<string[]> {
+  const said: string[] = [];
+
+  for (const round of rounds) {
+    if (round.status === "settled") continue;
+
+    const opens = toDate(round.opensAt);
+    const locks = toDate(round.locksAt);
+    const label = monthLabel(round.id);
+
+    const post = async (body: string, flag: "announcedOpen" | "announcedLock") => {
+      const batch = db.batch();
+      batch.set(db.collection("chat").doc(), {
+        uid: SYSTEM_UID,
+        body,
+        parentId: null,
+        createdAt: new Date(),
+      });
+      batch.set(db.doc(`rounds/${round.id}`), { [flag]: true }, { merge: true });
+      await batch.commit();
+      said.push(`${round.id}:${flag}`);
+    };
+
+    if (!round.announcedOpen && opens && now >= opens) {
+      const when = locks
+        ? locks.toLocaleString("en-GB", {
+            day: "numeric",
+            month: "long",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "UTC",
+          })
+        : null;
+      await post(
+        `${label} is open. Up to five picks each, and they seal` +
+          (when ? ` on ${when} UTC.` : " at the lock.") +
+          " Nobody sees anyone else's until then.",
+        "announcedOpen",
+      );
+    }
+
+    if (!round.announcedLock && locks && now >= locks) {
+      await post(
+        `Picks are sealed for ${label}. Everyone's holdings are now visible, ` +
+          "and the baseline price is the one taken at the lock. Four weekly " +
+          "checkpoints from here.",
+        "announcedLock",
+      );
+    }
+  }
+
+  return said;
+}
+
 export async function GET(request: NextRequest) {
   const ok = authorized(request);
   if (ok === null) {
@@ -237,7 +306,10 @@ export async function GET(request: NextRequest) {
 
   const db = adminDb();
   const now = new Date();
-  const plans = await buildPlan(db, now);
+  const roundsSnap = await db.collection("rounds").get();
+  const rounds = roundsSnap.docs.map((d) => ({ ...(d.data() as Round), id: d.id }));
+
+  const plans = await buildPlan(db, rounds, now);
 
   // Say what is needed and stop. This is what the GitHub Action asks for.
   if (request.nextUrl.searchParams.get("plan") === "1") {
@@ -255,8 +327,16 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Announcements are not conditional on there being prices to fetch: a
+  // month opens before anyone has picked anything.
+  const said = await announce(db, rounds, now);
+
   if (plans.length === 0) {
-    return NextResponse.json({ ok: true, note: "No round is inside its pricing window." });
+    return NextResponse.json({
+      ok: true,
+      announced: said,
+      note: "No round is inside its pricing window.",
+    });
   }
 
   const provider = getPriceProvider();
@@ -280,6 +360,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     ok: results.every((r) => r.error === null),
     provider: provider.name,
+    announced: said,
     rounds: results,
   });
 }
@@ -312,7 +393,9 @@ export async function POST(request: NextRequest) {
   }
 
   const db = adminDb();
-  const plans = await buildPlan(db, new Date());
+  const roundsSnap = await db.collection("rounds").get();
+  const rounds = roundsSnap.docs.map((d) => ({ ...(d.data() as Round), id: d.id }));
+  const plans = await buildPlan(db, rounds, new Date());
   if (plans.length === 0) {
     return NextResponse.json({ ok: true, note: "No round is inside its pricing window." });
   }

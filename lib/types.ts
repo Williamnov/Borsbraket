@@ -176,6 +176,17 @@ export type ChatMessage = {
 /** Matches the ceiling firestore.rules enforces. */
 export const MAX_MESSAGE_CHARS = 2000;
 
+/**
+ * The author of a message the league itself posted.
+ *
+ * Only the weekly job writes these, through the Admin SDK, which is the
+ * one caller the rules do not apply to — a signed-in client cannot claim
+ * this uid, because the chat rule pins the author to the auth token.
+ * There is no profile document behind it, so the board renders it as the
+ * league rather than as a player.
+ */
+export const SYSTEM_UID = "system";
+
 export type Market = {
   code: string;
   name: string;
@@ -209,6 +220,15 @@ export type Round = {
   picksPerRound: number;
   status: RoundStatus;
   settledAt?: Instant;
+
+  /**
+   * Whether the board has already been told this month opened, and that
+   * it sealed. Flags on the round rather than a search of the chat: the
+   * job runs daily, and "have I said this already" should cost a field
+   * that is already loaded rather than a query per run.
+   */
+  announcedOpen?: boolean;
+  announcedLock?: boolean;
 };
 
 /** One entry in a player's monthly portfolio. */

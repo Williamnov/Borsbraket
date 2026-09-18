@@ -1457,3 +1457,25 @@ tbody tr {
     transition: none;
   }
 }
+
+/* A message the league posted itself — see SYSTEM_UID. It reads as the
+   board's own voice rather than as a player, so it gets the crown, a
+   tinted rail and no avatar. */
+.chat-message.is-system {
+  background: var(--accent-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--s3);
+  margin: calc(var(--s2) * -1) calc(var(--s2) * -1) 0;
+}
+
+.chat-system-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+.chat-system-mark svg { width: 22px; height: 16px; }
+
+.chat-message.is-system .chat-author { color: var(--accent); }

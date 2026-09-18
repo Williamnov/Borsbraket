@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Timestamp, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, RequirePlayer, Reveal } from "@/components/ui";
+import { BrandMark } from "@/components/BrandMark";
 import { firestore } from "@/lib/firebase/client";
 import { postChatMessage } from "@/lib/chat";
 import { markChatRead } from "@/lib/chatRead";
@@ -13,6 +14,7 @@ import { displayName, timeAgo } from "@/lib/format";
 import {
   CHAT_MIN_GAP_SECONDS,
   MAX_MESSAGE_CHARS,
+  SYSTEM_UID,
   toDate,
   type ChatMessage,
   type Profile,
@@ -216,15 +218,25 @@ function Message({
   onDelete?: () => void;
 }) {
   const when = toDate(message.createdAt);
+  // Written by the weekly job, not by a player. There is no profile
+  // behind this uid, so it gets the crown and the league's name rather
+  // than an avatar with nobody in it.
+  const system = message.uid === SYSTEM_UID;
 
   return (
-    <div className="chat-message">
-      <Avatar profile={author} />
+    <div className={system ? "chat-message is-system" : "chat-message"}>
+      {system ? (
+        <span className="chat-system-mark" aria-hidden="true">
+          <BrandMark />
+        </span>
+      ) : (
+        <Avatar profile={author} />
+      )}
       <div className="chat-body">
         <div className="chat-meta">
           <span className="chat-author">
-            {displayName(author ?? null)}
-            {you ? " (you)" : ""}
+            {system ? "BörsBråket" : displayName(author ?? null)}
+            {you && !system ? " (you)" : ""}
           </span>
           <time
             className="hint"
