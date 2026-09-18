@@ -53,6 +53,21 @@ export type Profile = {
   approvedAt?: Instant;
 
   /**
+   * How far this player has read the message board.
+   *
+   * On the profile rather than in localStorage so that reading the board
+   * on a phone clears the badge on a laptop. It is nearly free: every
+   * page already subscribes to the profiles collection, so this arrives
+   * on a document that was being read anyway, and it costs one write per
+   * visit to the board rather than one per message.
+   *
+   * localStorage is still consulted alongside it — see lib/chatRead.ts —
+   * because it updates instantly and works while offline. Whichever mark
+   * is later wins.
+   */
+  chatReadAt?: Instant;
+
+  /**
    * Written by earlier versions and read only so that a profile saved
    * before the rename still renders. Saving a profile clears them.
    * `color` is gone entirely: the avatar's tint is derived from the uid,

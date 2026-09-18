@@ -26,12 +26,18 @@ const VIEW = 260;
 /**
  * The saved square, in device pixels.
  *
- * 256 is enough for an 88px avatar on a 2× screen and keeps the data URL
- * to a few tens of kilobytes. It matters more than it looks: the photo
- * lives on the profile document, and every reader of the league table
- * downloads every player's.
+ * The largest this is ever shown is the 88px avatar on a profile page,
+ * so 192 covers it on a 2× screen with a little to spare. It matters
+ * more than the number suggests: the photo is a base64 string on the
+ * profile document, and every reader of the league table downloads every
+ * player's. 192 rather than 256 is about forty per cent fewer pixels for
+ * no visible difference.
+ *
+ * It lives on the document rather than in Cloud Storage because Cloud
+ * Storage needs a billing account, and this project is on the free plan.
+ * That is the real fix once the league outgrows it.
  */
-const OUTPUT = 256;
+const OUTPUT = 192;
 
 const MAX_ZOOM = 4;
 

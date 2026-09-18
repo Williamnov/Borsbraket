@@ -275,7 +275,19 @@ export function useChat(enabled: boolean) {
  */
 const UNREAD_CAP = 50;
 
-export function useChatUnread(uid: string | null, enabled: boolean): number {
+export function useChatUnread(
+  uid: string | null,
+  enabled: boolean,
+  /**
+   * The mark stored on the profile document, in epoch milliseconds.
+   *
+   * Passed in rather than read here so this hook keeps opening exactly
+   * one listener: the caller already has the profile from the auth
+   * context, and re-reading it would be a second subscription to a
+   * document that is on screen anyway.
+   */
+  remoteMark?: number | null,
+): number {
   const [mark, setMark] = useState<number | null>(null);
   const [unread, setUnread] = useState(0);
 
@@ -293,15 +305,25 @@ export function useChatUnread(uid: string | null, enabled: boolean): number {
     return subscribeChatRead(refresh);
   }, [uid, enabled]);
 
+  // Whichever mark is later wins. localStorage is instant and works
+  // offline; the profile is the one that crosses devices. Taking the
+  // later of the two means reading the board anywhere clears the badge
+  // everywhere, and a device that has been offline does not resurrect
+  // messages the player has already seen elsewhere.
+  const effective = useMemo(() => {
+    if (mark === null && (remoteMark ?? null) === null) return null;
+    return Math.max(mark ?? 0, remoteMark ?? 0);
+  }, [mark, remoteMark]);
+
   useEffect(() => {
-    if (!uid || !enabled || mark === null) {
+    if (!uid || !enabled || effective === null) {
       setUnread(0);
       return;
     }
     const unsubscribe = onSnapshot(
       query(
         collection(firestore(), "chat"),
-        where("createdAt", ">", Timestamp.fromMillis(mark)),
+        where("createdAt", ">", Timestamp.fromMillis(effective)),
         orderBy("createdAt", "desc"),
         limit(UNREAD_CAP),
       ),
@@ -310,7 +332,7 @@ export function useChatUnread(uid: string | null, enabled: boolean): number {
       () => setUnread(0),
     );
     return unsubscribe;
-  }, [uid, enabled, mark]);
+  }, [uid, enabled, effective]);
 
   return unread;
 }

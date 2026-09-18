@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { deleteDoc, doc } from "firebase/firestore";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Timestamp, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, RequirePlayer, Reveal } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
@@ -28,11 +28,15 @@ export default function ChatPage() {
 
 type Thread = { root: ChatMessage; replies: ChatMessage[]; orphaned: boolean };
 
+/** Standing on the board for a while should not mean a write a minute. */
+const WRITE_GAP_MS = 30_000;
+
 function Board() {
   const { profile, isAdmin } = useAuth();
   const { profileMap } = useLeagueBase();
   const { messages, loading, error } = useChat(true);
   const [replyTo, setReplyTo] = useState<string | null>(null);
+  const lastWritten = useRef(0);
   // The rules enforce the gap between messages; this only stops the
   // composer from making a request it already knows will be refused.
   const [nextAllowedAt, setNextAllowedAt] = useState(0);
@@ -83,7 +87,21 @@ function Board() {
       (latest, message) => Math.max(latest, toDate(message.createdAt)?.getTime() ?? 0),
       0,
     );
-    markChatRead(uid, Math.max(newest, Date.now()));
+    const at = Math.max(newest, Date.now());
+    markChatRead(uid, at);
+
+    // And on the profile, so the badge clears on your other devices too.
+    // Once per visit rather than once per message: the effect reruns as
+    // messages arrive, but only a mark that actually moves is worth a
+    // write, and the profile is already on screen so nothing re-reads it.
+    if (at > lastWritten.current + WRITE_GAP_MS) {
+      lastWritten.current = at;
+      void updateDoc(doc(firestore(), "profiles", uid), {
+        chatReadAt: Timestamp.fromMillis(at),
+      }).catch(() => {
+        /* localStorage already has it; the badge still clears here. */
+      });
+    }
   }, [uid, messages]);
 
   async function post(body: string, parentId: string | null) {

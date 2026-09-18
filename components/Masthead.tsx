@@ -7,6 +7,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
 import { Search } from "@/components/Search";
 import { useChatUnread } from "@/lib/hooks";
+import { toDate } from "@/lib/types";
 
 /**
  * Every link the masthead can show, in order, with who it is for.
@@ -37,7 +38,11 @@ export function Masthead() {
   // the page is what clears the mark, so a badge there would be a count
   // of what you are already looking at.
   const onChat = pathname === "/chat";
-  const unread = useChatUnread(profile?.uid ?? null, canPlay && !onChat);
+  const unread = useChatUnread(
+    profile?.uid ?? null,
+    canPlay && !onChat,
+    toDate(profile?.chatReadAt)?.getTime() ?? null,
+  );
 
   /**
    * The masthead earns a hairline shadow once the page has moved under
