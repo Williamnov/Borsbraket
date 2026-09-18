@@ -6,18 +6,28 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useChatUnread } from "@/lib/hooks";
 
-const PLAYER_LINKS = [
-  { href: "/league", label: "League" },
-  { href: "/month", label: "This month" },
-  { href: "/chat", label: "Chat" },
-  { href: "/history", label: "History" },
-  { href: "/instructions", label: "How it works" },
-  { href: "/profile", label: "Profile" },
+/**
+ * Every link the masthead can show, in order, with who it is for.
+ *
+ * The list does not change with who is signed in — the markup is
+ * identical for every visitor, because these pages are prerendered and
+ * React must hydrate against HTML that was written before anyone knew
+ * who would ask for it. `scope` becomes a class, and globals.css hides
+ * what does not apply. See the inline script in app/layout.tsx.
+ */
+const LINKS: { href: string; label: string; scope: "all" | "player" | "admin" }[] = [
+  { href: "/league", label: "League", scope: "player" },
+  { href: "/month", label: "This month", scope: "player" },
+  { href: "/chat", label: "Chat", scope: "player" },
+  { href: "/history", label: "History", scope: "player" },
+  { href: "/instructions", label: "How it works", scope: "all" },
+  { href: "/profile", label: "Profile", scope: "player" },
+  { href: "/admin", label: "Admin", scope: "admin" },
 ];
 
 export function Masthead() {
   const pathname = usePathname();
-  const { user, profile, canPlay, isAdmin, loading, signOut } = useAuth();
+  const { profile, canPlay, signOut } = useAuth();
   const [lifted, setLifted] = useState(false);
   const [hidden, setHidden] = useState(false);
 
@@ -71,15 +81,6 @@ export function Masthead() {
     };
   }, []);
 
-  // The Admin link is only built for admins, and /admin redirects anyone
-  // else away. Both are conveniences: firestore.rules is what actually
-  // refuses the writes.
-  const links = canPlay
-    ? isAdmin
-      ? [...PLAYER_LINKS, { href: "/admin", label: "Admin" }]
-      : PLAYER_LINKS
-    : [{ href: "/instructions", label: "How it works" }];
-
   return (
     <header
       className={`masthead${lifted ? " is-lifted" : ""}${hidden ? " is-hidden" : ""}`}
@@ -114,12 +115,13 @@ export function Masthead() {
         </Link>
 
         <nav className="nav">
-          {links.map((link) => {
+          {LINKS.map((link) => {
             const badge = link.href === "/chat" ? unread : 0;
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                className={link.scope === "all" ? undefined : `is-${link.scope}`}
                 aria-current={pathname === link.href ? "page" : undefined}
               >
                 {link.label}
@@ -138,19 +140,17 @@ export function Masthead() {
           })}
         </nav>
 
-        {!loading &&
-          (user ? (
-            <>
-              <span className="nav-divider" aria-hidden="true" />
-              <button type="button" className="signout small" onClick={() => void signOut()}>
-                Sign out
-              </button>
-            </>
-          ) : (
-            <Link href="/login" className="button primary small">
-              Sign in
-            </Link>
-          ))}
+        {/* Both are always in the markup; CSS shows one. Gating on
+            `loading` meant neither appeared until hydration finished. */}
+        <span className="auth-in">
+          <span className="nav-divider" aria-hidden="true" />
+          <button type="button" className="signout small" onClick={() => void signOut()}>
+            Sign out
+          </button>
+        </span>
+        <Link href="/login" className="button primary small auth-out">
+          Sign in
+        </Link>
       </div>
     </header>
   );

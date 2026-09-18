@@ -42,6 +42,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
       <body>
+        {/*
+          Runs before the masthead below it is parsed, so the navigation
+          paints with the right links in the very first frame.
+
+          Every page here is prerendered, so the HTML is the same for a
+          visitor and an admin — it has to be, or hydration would
+          disagree with it. Which links are visible is therefore a CSS
+          question, and this answers it from the last visit before React
+          exists. Without it the nav shows one link until hydration
+          finishes and then snaps to seven.
+
+          A hint about what to paint, never a permission: /admin
+          redirects anyone who does not belong and firestore.rules
+          refuses the reads regardless. The key matches HINT_KEY in
+          lib/authHint.ts.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var h=JSON.parse(localStorage.getItem("borsbraket:auth-hint")||"null");if(!h)return;var d=document.documentElement;if(h.signedIn)d.setAttribute("data-signed-in","1");if(h.canPlay)d.setAttribute("data-player","1");if(h.isAdmin)d.setAttribute("data-admin","1")}catch(e){}})()`,
+          }}
+        />
         {/* The scroll reveal is the only thing that hides content until
             script runs, so it is switched off when there is none. */}
         <noscript>

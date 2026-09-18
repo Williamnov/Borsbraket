@@ -21,9 +21,36 @@
  * with it would be a hydration mismatch.
  */
 
-const KEY = "borsbraket:auth-hint";
+/**
+ * Kept in sync by hand with the inline script in app/layout.tsx, which
+ * reads the same key before React exists. If this name changes, that
+ * script changes with it.
+ */
+export const HINT_KEY = "borsbraket:auth-hint";
+const KEY = HINT_KEY;
 
-export type AuthHint = { canPlay: boolean; isAdmin: boolean };
+export type AuthHint = { signedIn: boolean; canPlay: boolean; isAdmin: boolean };
+
+/**
+ * Mirrors the hint onto <html> as data attributes.
+ *
+ * The masthead renders the same links for everyone and lets CSS decide
+ * which are visible, so that the prerendered HTML is identical for every
+ * visitor and React never has to disagree with it during hydration.
+ * These attributes are what the CSS keys off. The inline script sets
+ * them before first paint; this keeps them true afterwards.
+ */
+export function applyHintAttributes(hint: AuthHint | null): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const set = (name: string, on: boolean) => {
+    if (on) root.setAttribute(name, "1");
+    else root.removeAttribute(name);
+  };
+  set("data-signed-in", hint?.signedIn === true);
+  set("data-player", hint?.canPlay === true);
+  set("data-admin", hint?.isAdmin === true);
+}
 
 const listeners = new Set<() => void>();
 
@@ -52,7 +79,10 @@ export function getHint(): AuthHint | null {
   try {
     const parsed = raw ? (JSON.parse(raw) as AuthHint) : null;
     lastParsed =
-      parsed && typeof parsed.canPlay === "boolean" && typeof parsed.isAdmin === "boolean"
+      parsed &&
+      typeof parsed.signedIn === "boolean" &&
+      typeof parsed.canPlay === "boolean" &&
+      typeof parsed.isAdmin === "boolean"
         ? parsed
         : null;
   } catch {

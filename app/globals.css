@@ -280,6 +280,45 @@ a:hover { text-decoration: underline; }
 }
 .nav a[aria-current="page"]::after { transform: scaleX(1); }
 
+/* ── Who sees which link ───────────────────────────────────────────────
+   Every visitor is served the same prerendered HTML, so the masthead
+   renders every link and hides the ones that do not apply. The data
+   attributes on <html> are set by the inline script in app/layout.tsx
+   before first paint and kept true by AuthProvider afterwards.
+
+   Doing this in CSS rather than in the component is what stops the nav
+   arriving one link at a time: React cannot know who you are until it
+   has hydrated, and by then the bar has already been on screen for a
+   few hundred milliseconds. */
+
+.nav .is-player,
+.nav .is-admin,
+.auth-in {
+  display: none;
+}
+
+html[data-player="1"] .nav .is-player,
+html[data-admin="1"] .nav .is-admin {
+  display: block;
+}
+
+html[data-signed-in="1"] .auth-in { display: inline-flex; }
+html[data-signed-in="1"] .auth-out { display: none; }
+
+/* The divider and the sign-out button used to be siblings of the nav and
+   picked up the masthead's own gap; wrapping them so CSS can hide the
+   pair together means reproducing it here. */
+.auth-in {
+  align-items: center;
+  gap: var(--s4);
+}
+
+/* The landing page's primary call to action, same problem and same
+   answer: two links in the markup, one of them shown. */
+.cta-player { display: none; }
+html[data-player="1"] .cta-player { display: inline-flex; }
+html[data-player="1"] .cta-guest { display: none; }
+
 /* Unread count on the Chat tab. Sits inside the link so it moves with
    the label and inherits the hover target rather than sitting beside it. */
 .nav-badge {

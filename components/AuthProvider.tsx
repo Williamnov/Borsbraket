@@ -13,7 +13,13 @@ import {
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
 import { doc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase/client";
-import { getHint, getServerHint, setHint, subscribeHint } from "@/lib/authHint";
+import {
+  applyHintAttributes,
+  getHint,
+  getServerHint,
+  setHint,
+  subscribeHint,
+} from "@/lib/authHint";
 import type { Profile } from "@/lib/types";
 
 /**
@@ -139,18 +145,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Clear the hint first: if the sign-out round trip is slow, the next
     // paint should already have stopped offering the league.
     setHint(null);
+    applyHintAttributes(null);
     if (configured) await fbSignOut(firebaseAuth());
   }, [configured]);
 
   const hint = useSyncExternalStore(subscribeHint, getHint, getServerHint);
   const resolved = authReady && profileReady;
 
-  // Remember the answer for the next visit, once it is actually known.
+  // Remember the answer for the next visit, once it is actually known,
+  // and correct the attributes the inline script guessed from the last
+  // one. Approval granted or revoked since then lands here.
   useEffect(() => {
     if (!resolved) return;
     const isAdmin = profile?.isAdmin === true;
     const canPlay = isAdmin || profile?.status === "approved";
-    setHint(user ? { canPlay, isAdmin } : null);
+    const next = user ? { signedIn: true, canPlay, isAdmin } : null;
+    setHint(next);
+    applyHintAttributes(next);
   }, [resolved, user, profile]);
 
   const value = useMemo<AuthValue>(() => {
