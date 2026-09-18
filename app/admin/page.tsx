@@ -6,7 +6,7 @@ import { Approvals } from "@/components/admin/Approvals";
 import { PriceGrid } from "@/components/admin/PriceGrid";
 import { RoundAdmin } from "@/components/admin/RoundAdmin";
 import { UniverseAdmin } from "@/components/admin/UniverseAdmin";
-import { Empty, Footer, PageHead, RequirePlayer } from "@/components/ui";
+import { Empty, PageHead, RequirePlayer } from "@/components/ui";
 import { useLeagueBase, useRoundPicks, useRoundPrices } from "@/lib/hooks";
 
 export default function AdminPage() {
@@ -62,7 +62,6 @@ function AdminPanels() {
         <UniverseAdmin instruments={instruments} markets={markets} />
       </div>
 
-      <Footer />
     </>
   );
 }

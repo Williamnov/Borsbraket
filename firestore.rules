@@ -77,6 +77,19 @@ service cloud.firestore {
 
     // ── Players ───────────────────────────────────────────────────────
 
+    // Profile photos are inline data URLs rather than Cloud Storage
+    // objects, so the size cap belongs here. Every reader of the league
+    // table downloads this document, and a document over Firestore's 1 MB
+    // limit stops being writable at all — so the ceiling is deliberately
+    // far below it. The prefix check keeps the field to an image.
+    function photoOk(data) {
+      return !('photoUrl' in data.keys())
+          || data.photoUrl == null
+          || (data.photoUrl is string
+              && data.photoUrl.size() <= 200000
+              && data.photoUrl.matches('^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$'));
+    }
+
     match /profiles/{uid} {
       // You can always read your own row, including while pending, so the
       // waiting-room page can explain itself. Approved players see the
@@ -88,7 +101,8 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.uid == uid
                     && request.resource.data.status == 'pending'
-                    && request.resource.data.isAdmin == false;
+                    && request.resource.data.isAdmin == false
+                    && photoOk(request.resource.data);
 
       // Cosmetic self-edits only. Approval and admin rights cannot move.
       allow update: if signedIn()
@@ -96,7 +110,8 @@ service cloud.firestore {
                     && request.resource.data.status == resource.data.status
                     && request.resource.data.isAdmin == resource.data.isAdmin
                     && request.resource.data.uid == resource.data.uid
-                    && request.resource.data.email == resource.data.email;
+                    && request.resource.data.email == resource.data.email
+                    && photoOk(request.resource.data);
 
       // Admins approve, reject and promote.
       allow read, write: if isAdmin();
@@ -121,6 +136,35 @@ service cloud.firestore {
 
     match /priceRuns/{id} {
       allow read, write: if isAdmin();
+    }
+
+    // ── Message board ─────────────────────────────────────────────────
+    // Approved players only, both to read and to post. A message is
+    // written once and never edited: allowing updates would let an author
+    // rewrite what everyone already replied to, and the audit value of a
+    // league argument is the whole point. You can delete your own; admins
+    // can delete anyone's.
+
+    match /chat/{messageId} {
+      allow read: if isApproved();
+
+      allow create: if isApproved()
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasOnly(['uid', 'body', 'parentId', 'createdAt'])
+                    && request.resource.data.body is string
+                    && request.resource.data.body.size() > 0
+                    && request.resource.data.body.size() <= 2000
+                    && (request.resource.data.parentId == null
+                        || request.resource.data.parentId is string)
+                    && request.resource.data.createdAt == request.time;
+
+      allow delete: if isApproved()
+                    && (resource.data.uid == request.auth.uid || isAdmin());
+
+      // No update rule at all, deliberately, and none for admins either:
+      // a posted message can be removed but never rewritten. isApproved()
+      // is already true for admins, so they read and delete through the
+      // rules above.
     }
 
     // ── Rounds ────────────────────────────────────────────────────────

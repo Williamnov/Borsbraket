@@ -4,6 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { Reveal } from "@/components/ui";
+
+const POINTS = [
+  {
+    label: "Picking",
+    text: "Up to five stocks a month, equal weight, from the Nordic exchanges plus the S&P 500, NYSE, Nasdaq, TSX and the London main market. Established companies only.",
+  },
+  {
+    label: "Scoring",
+    text: "Prices are recorded once a week. Your return is the average across your holdings, measured from the opening price. Monthly finishes pay 10/7/5/4/3/2, one point for everyone else who submitted.",
+  },
+  {
+    label: "Sealed picks",
+    text: "Nobody sees anyone else's picks until the month locks. That is enforced in the database, not hidden in the interface.",
+  },
+  {
+    label: "Invite only",
+    text: "Anyone can reach the site and sign in, but an admin has to approve the account before it can pick or see the league.",
+  },
+];
 
 export default function LandingPage() {
   const { canPlay, loading } = useAuth();
@@ -14,15 +34,17 @@ export default function LandingPage() {
   }, [loading, canPlay, router]);
 
   return (
-    <div className="stack" style={{ paddingTop: 48 }}>
+    <div className="stack" style={{ paddingTop: 56 }}>
       <div className="measure">
-        <h1 style={{ fontSize: 34 }}>Five stocks. One month. One table.</h1>
-        <p className="secondary" style={{ marginTop: 12, fontSize: 16 }}>
+        <h1 style={{ fontSize: 38, letterSpacing: "-0.03em" }}>
+          Five stocks. One month. One table.
+        </h1>
+        <p className="secondary" style={{ marginTop: 14, fontSize: 17 }}>
           BörsBråket is a private stock-picking league. Everyone picks up to five stocks at the
           start of the month, prices are checked once a week, and the month&rsquo;s return decides
           who takes the points.
         </p>
-        <div className="row" style={{ marginTop: 24 }}>
+        <div className="row" style={{ marginTop: 28 }}>
           <Link href="/login" className="button primary">
             Sign in to play
           </Link>
@@ -32,41 +54,15 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <div className="panel" style={{ marginTop: 16 }}>
-        <div className="panel-body">
-          <div className="grid-2">
-            <div className="stack-sm">
-              <span className="label">Picking</span>
-              <p className="secondary">
-                Up to five stocks per month, equal weight, from the Nordic exchanges plus the S&amp;P
-                500, NYSE, Nasdaq, TSX and the London main market. Established companies only — no
-                penny stocks that can swing 1000% in a week.
-              </p>
+      <div className="grid-2" style={{ marginTop: 24 }}>
+        {POINTS.map((point, index) => (
+          <Reveal key={point.label} delay={index * 70}>
+            <div className="stack-sm" style={{ gap: 6 }}>
+              <span className="label">{point.label}</span>
+              <p className="secondary">{point.text}</p>
             </div>
-            <div className="stack-sm">
-              <span className="label">Scoring</span>
-              <p className="secondary">
-                Prices are recorded four times a month, once a week. Your return is the average
-                across your holdings, measured from the opening price. Monthly finishes pay
-                10/7/5/4/3/2 points, one point for everyone else who submitted.
-              </p>
-            </div>
-            <div className="stack-sm">
-              <span className="label">Sealed picks</span>
-              <p className="secondary">
-                Nobody sees anyone else&rsquo;s picks until the month locks. That is enforced in the
-                database, not just hidden in the interface.
-              </p>
-            </div>
-            <div className="stack-sm">
-              <span className="label">Invite only</span>
-              <p className="secondary">
-                Anyone can reach the site and sign in, but an admin has to approve the account
-                before it can pick or see the league.
-              </p>
-            </div>
-          </div>
-        </div>
+          </Reveal>
+        ))}
       </div>
     </div>
   );

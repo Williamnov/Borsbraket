@@ -5,11 +5,11 @@ import { useAuth } from "@/components/AuthProvider";
 import { PickEditor } from "@/components/PickEditor";
 import {
   Empty,
-  Footer,
   PageHead,
   Panel,
   PlayerCell,
   RequirePlayer,
+  Reveal,
   StatusPill,
   Value,
   WeekBars,
@@ -68,7 +68,6 @@ function MonthView() {
         <PageHead title="No month open">
           Nobody has opened a round yet. An admin starts one from the admin panel.
         </PageHead>
-        <Footer />
       </>
     );
   }
@@ -93,7 +92,7 @@ function MonthView() {
           : `Measured ${round.startsOn} to ${round.endsOn}, from the opening price to the latest weekly check.`}
       </PageHead>
 
-      <div className="grid-2">
+      <Reveal className="grid-2">
         <Panel title="Your picks">
           {phase === "open" && profile ? (
             <PickEditor
@@ -166,8 +165,9 @@ function MonthView() {
             </div>
           )}
         </Panel>
-      </div>
+      </Reveal>
 
+      <Reveal delay={80}>
       <section className="panel" style={{ marginTop: 20 }}>
         <header>
           <h2>Standings</h2>
@@ -238,8 +238,7 @@ function MonthView() {
           )}
         </div>
       </section>
-
-      <Footer />
+      </Reveal>
     </>
   );
 }

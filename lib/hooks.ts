@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, doc, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, doc, getDocs, limit, onSnapshot, orderBy, query } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
 import type {
+  ChatMessage,
   Instrument,
   LeagueSettings,
   Market,
@@ -226,6 +227,53 @@ export function useRoundBundles(roundIds: string[], enabled: boolean) {
   }, [key, enabled]);
 
   return { bundles, loading };
+}
+
+/** How many messages the board keeps on screen. */
+const CHAT_WINDOW = 300;
+
+/**
+ * The league message board, live.
+ *
+ * Newest first from Firestore so the window keeps the recent end of the
+ * conversation; the page re-orders what it needs. Timestamps are read as
+ * estimates so your own message does not jump when the server clock
+ * replaces the pending value.
+ */
+export function useChat(enabled: boolean) {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+
+    const unsubscribe = onSnapshot(
+      query(collection(firestore(), "chat"), orderBy("createdAt", "desc"), limit(CHAT_WINDOW)),
+      (snap) => {
+        setMessages(
+          snap.docs.map((d) => ({
+            ...(d.data({ serverTimestamps: "estimate" }) as Omit<ChatMessage, "id">),
+            id: d.id,
+          })),
+        );
+        setError(null);
+        setLoading(false);
+      },
+      (err) => {
+        setError(err.message);
+        setLoading(false);
+      },
+    );
+    return unsubscribe;
+  }, [enabled]);
+
+  return { messages, loading, error };
 }
 
 /** Countdown that re-renders once a second. */

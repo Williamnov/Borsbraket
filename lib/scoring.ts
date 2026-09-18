@@ -159,12 +159,36 @@ export function buildSeason(
   return [...rows.values()];
 }
 
-export type SeasonSort = "points" | "cumulative" | "average" | "wins";
+export type SeasonSort = "player" | "played" | "average" | "cumulative" | "wins" | "points";
+export type SortDirection = "asc" | "desc";
 
-export function sortSeason(rows: SeasonRow[], by: SeasonSort): SeasonRow[] {
+/**
+ * Sort the season table by one column.
+ *
+ * Players with nothing in the column sort to the bottom either way —
+ * reversing the direction should surface the worst player, not the ones
+ * who have not played yet. Ties fall back to points, then compounded
+ * return, so the order never jitters between renders.
+ */
+export function sortSeason(
+  rows: SeasonRow[],
+  by: SeasonSort,
+  direction: SortDirection = "desc",
+  nameOf?: (uid: string) => string,
+): SeasonRow[] {
+  const sign = direction === "asc" ? -1 : 1;
+
+  if (by === "player") {
+    const name = (r: SeasonRow) => (nameOf ? nameOf(r.uid) : r.uid);
+    return [...rows].sort(
+      (a, b) => -sign * name(a).localeCompare(name(b), "sv", { sensitivity: "base" }),
+    );
+  }
+
   const key = (r: SeasonRow): number | null =>
     by === "points" ? r.points
       : by === "wins" ? r.wins
+      : by === "played" ? r.played
       : by === "average" ? r.average
       : r.cumulative;
 
@@ -172,7 +196,7 @@ export function sortSeason(rows: SeasonRow[], by: SeasonSort): SeasonRow[] {
     const x = key(a);
     const y = key(b);
     if ((x === null) !== (y === null)) return x === null ? 1 : -1;
-    if ((y ?? 0) !== (x ?? 0)) return (y ?? 0) - (x ?? 0);
+    if ((y ?? 0) !== (x ?? 0)) return sign * ((y ?? 0) - (x ?? 0));
     if (b.points !== a.points) return b.points - a.points;
     return (b.cumulative ?? -Infinity) - (a.cumulative ?? -Infinity);
   });

@@ -26,8 +26,19 @@
   --silver: #6f7681;
   --bronze: #96601f;
 
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-sm: 7px;
+
+  /* One spacing scale, so nothing is spaced by eye. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+
+  --shadow-sm: 0 1px 2px rgba(16, 22, 28, 0.04);
 
   /* next/font injects --font-sans-face / --font-display-face / --font-mono-face
      on <html>. The fallbacks keep the page readable if a face fails to load. */
@@ -53,6 +64,13 @@ body {
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  /* Keeps the site footer on the floor of short pages instead of
+     floating halfway up. */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 h1,
@@ -61,12 +79,12 @@ h3,
 h4 {
   font-family: var(--font-display);
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.018em;
   margin: 0;
   text-wrap: balance;
 }
 
-h1 { font-size: 28px; line-height: 1.2; }
+h1 { font-size: 29px; line-height: 1.18; }
 h2 { font-size: 20px; }
 h3 { font-size: 16px; }
 
@@ -84,6 +102,11 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius-sm);
 }
 
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -92,34 +115,36 @@ a:hover { text-decoration: underline; }
 /* ── Layout ────────────────────────────────────────────────────────── */
 
 .shell {
+  width: 100%;
   max-width: 1040px;
   margin: 0 auto;
-  padding-inline: 20px;
-  padding-block: 0 72px;
+  padding-inline: var(--s5);
+  padding-block: 0 var(--s7);
+  flex: 1 0 auto;
 }
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: var(--s5);
 }
 
 .stack-sm {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--s3);
 }
 
 .row {
   display: flex;
-  gap: 12px;
+  gap: var(--s3);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .spread {
   display: flex;
-  gap: 16px;
+  gap: var(--s4);
   align-items: baseline;
   justify-content: space-between;
   flex-wrap: wrap;
@@ -127,8 +152,9 @@ a:hover { text-decoration: underline; }
 
 .grid-2 {
   display: grid;
-  gap: 20px;
+  gap: var(--s5);
   grid-template-columns: 1fr;
+  align-items: start;
 }
 
 @media (min-width: 860px) {
@@ -137,66 +163,123 @@ a:hover { text-decoration: underline; }
 
 .muted { color: var(--ink-3); }
 .secondary { color: var(--ink-2); }
-.measure { max-width: 68ch; }
+.measure { max-width: 62ch; }
 
 /* ── Masthead and navigation ───────────────────────────────────────── */
 
 .masthead {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(160%) blur(10px);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Set by the masthead itself once the page has scrolled under it. */
+.masthead.is-lifted {
+  box-shadow: 0 1px 12px rgba(16, 22, 28, 0.07);
+  border-color: var(--line-strong);
 }
 
 .masthead-inner {
   max-width: 1040px;
   margin: 0 auto;
-  padding-inline: 20px;
-  padding-block: 16px;
+  padding-inline: var(--s5);
+  padding-block: var(--s3);
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: var(--s4);
   flex-wrap: wrap;
 }
 
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 19px;
-  letter-spacing: -0.02em;
+  font-size: 18px;
+  letter-spacing: -0.025em;
   color: var(--ink);
   margin-right: auto;
 }
 .brand:hover { text-decoration: none; }
 
+/* The favicon mark, repeated in the masthead so the tab and the page
+   agree with each other. */
+.brand-mark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 15px;
+}
+.brand-mark i {
+  display: block;
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--accent);
+}
+.brand-mark i:nth-child(1) { height: 6px; opacity: 0.4; }
+.brand-mark i:nth-child(2) { height: 10px; opacity: 0.68; }
+.brand-mark i:nth-child(3) { height: 15px; }
+
 .nav {
   display: flex;
-  gap: 4px;
+  gap: var(--s1);
   flex-wrap: wrap;
 }
 
+/* Active pages get a rule under the label rather than a filled chip:
+   quieter, and it lines up with the masthead border. */
 .nav a {
-  padding: 6px 11px;
+  position: relative;
+  padding: 6px 10px;
   border-radius: var(--radius-sm);
   color: var(--ink-2);
   font-size: 14px;
   font-weight: 500;
 }
 .nav a:hover {
+  color: var(--ink);
   background: var(--surface-hover);
   text-decoration: none;
 }
 .nav a[aria-current="page"] {
-  background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--ink);
   font-weight: 600;
+}
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -13px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav a[aria-current="page"]::after { transform: scaleX(1); }
+
+/* Separates the account controls from the navigation links. */
+.nav-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+  flex: 0 0 auto;
 }
 
 .page-head {
-  padding-block: 32px 8px;
+  padding-block: var(--s6) var(--s2);
 }
 .page-head p {
   color: var(--ink-2);
   margin-top: 6px;
-  max-width: 68ch;
+  max-width: 62ch;
 }
 
 /* ── Panels ────────────────────────────────────────────────────────── */
@@ -205,23 +288,28 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
 }
 
 .panel > header {
-  padding: 14px 18px;
+  padding: var(--s3) var(--s4);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--s3);
   flex-wrap: wrap;
 }
 
 .panel > header h2,
-.panel > header h3 { font-size: 15px; }
+.panel > header h3 {
+  font-size: 14px;
+  letter-spacing: 0.01em;
+}
 
 .panel > header .grow { margin-left: auto; }
 
-.panel-body { padding: 18px; }
+.panel-body { padding: var(--s4); }
 .panel-body.flush { padding: 0; }
 
 .label {
@@ -244,9 +332,10 @@ table {
 
 th {
   text-align: left;
-  padding: 10px 14px;
+  padding: 9px var(--s4);
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  background: var(--surface-sunk);
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -255,13 +344,15 @@ th {
 }
 
 td {
-  padding: 12px 14px;
+  padding: var(--s3) var(--s4);
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
 
 tbody tr:last-child td { border-bottom: 0; }
-tr.is-me { background: var(--accent-soft); }
+tbody tr:hover td { background: var(--surface-sunk); }
+tr.is-me td { background: var(--accent-soft); }
+tr.is-me:hover td { background: var(--accent-soft); }
 
 th.right, td.right { text-align: right; }
 th.center, td.center { text-align: center; }
@@ -305,6 +396,7 @@ th.center, td.center { text-align: center; }
 }
 
 .player .motto {
+  display: block;
   font-size: 12px;
   color: var(--ink-3);
   overflow: hidden;
@@ -313,17 +405,30 @@ th.center, td.center { text-align: center; }
 }
 
 .avatar {
+  position: relative;
   width: 28px;
   height: 28px;
   flex: 0 0 auto;
   border-radius: 50%;
+  overflow: hidden;
   display: grid;
   place-items: center;
   font-size: 15px;
   line-height: 1;
   background: var(--surface-sunk);
+  box-shadow: inset 0 0 0 1px rgba(16, 22, 28, 0.06);
 }
-.avatar.lg { width: 48px; height: 48px; font-size: 24px; }
+.avatar.lg { width: 56px; height: 56px; font-size: 27px; }
+.avatar.xl { width: 88px; height: 88px; font-size: 42px; }
+
+/* A photo, when the player has uploaded one, fills the same circle the
+   emoji sits in — so every table row keeps its rhythm either way. */
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 /* Player accent colours, used only as a ring behind the emoji. */
 .c1 { background: #e8f0fb; }
@@ -350,6 +455,7 @@ th.center, td.center { text-align: center; }
   padding: 3px 8px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
+  background: var(--surface-sunk);
   font-family: var(--font-mono);
   font-size: 12px;
   white-space: nowrap;
@@ -385,18 +491,19 @@ button,
   font-size: 14px;
   font-weight: 600;
   line-height: 1;
-  padding: 10px 16px;
+  padding: 10px var(--s4);
   border-radius: var(--radius-sm);
   border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
 
 button:hover:not(:disabled),
 .button:hover {
   background: var(--surface-hover);
+  border-color: var(--ink-3);
   text-decoration: none;
 }
 
@@ -420,10 +527,29 @@ button.quiet {
   color: var(--ink-2);
   padding-inline: 10px;
 }
-button.quiet:hover:not(:disabled) { background: var(--surface-hover); }
+button.quiet:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: transparent;
+  color: var(--ink);
+}
 
-button.small { padding: 6px 11px; font-size: 13px; }
+button.small, .button.small { padding: 7px 12px; font-size: 13px; }
 button.danger { color: var(--down); }
+button.danger:hover:not(:disabled) { border-color: var(--down); background: #fdf3f2; }
+
+/* Sign out is the one control that throws away what you are looking at,
+   so it does not get to look like a navigation link. */
+button.signout {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-weight: 600;
+}
+button.signout:hover:not(:disabled) {
+  border-color: #e3b7b2;
+  background: #fdf3f2;
+  color: var(--down);
+}
 
 input,
 select,
@@ -462,7 +588,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
 /* ── Notices ───────────────────────────────────────────────────────── */
 
 .notice {
-  padding: 14px 16px;
+  padding: var(--s3) var(--s4);
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface-sunk);
@@ -472,7 +598,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
 .notice.bad { border-color: #f0c8c4; background: #fdf3f2; color: var(--down); }
 
 .empty {
-  padding: 36px 18px;
+  padding: var(--s6) var(--s4);
   text-align: center;
   color: var(--ink-3);
   font-size: 14px;
@@ -497,10 +623,10 @@ fieldset { border: 0; margin: 0; padding: 0; }
 
 /* ── Instructions typography ───────────────────────────────────────── */
 
-.prose { max-width: 68ch; }
-.prose h2 { margin-top: 36px; margin-bottom: 10px; }
-.prose h3 { margin-top: 24px; margin-bottom: 6px; }
-.prose p { margin-bottom: 12px; color: var(--ink-2); }
+.prose { max-width: 62ch; }
+.prose h2 { margin-top: var(--s6); margin-bottom: 10px; }
+.prose h3 { margin-top: var(--s5); margin-bottom: 6px; }
+.prose p { margin-bottom: var(--s3); color: var(--ink-2); }
 .prose ul, .prose ol { margin: 0 0 14px; padding-left: 22px; color: var(--ink-2); }
 .prose li { margin-bottom: 6px; }
 .prose strong { color: var(--ink); font-weight: 600; }
@@ -513,16 +639,214 @@ fieldset { border: 0; margin: 0; padding: 0; }
   padding: 1px 5px;
 }
 
-/* ── Footer ────────────────────────────────────────────────────────── */
+/* ── Sortable columns ──────────────────────────────────────────────── */
 
-.footer {
-  margin-top: 56px;
-  padding-top: 20px;
+th.sortable { padding: 0; }
+
+.sort-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 9px var(--s4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.sort-button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  border-color: transparent;
+  color: var(--ink-2);
+}
+.sort-button:focus-visible { outline-offset: -2px; }
+
+th.sortable.right .sort-button { justify-content: flex-end; }
+th.sortable.center .sort-button { justify-content: center; }
+th.sortable.is-sorted .sort-button { color: var(--accent); }
+
+/* A triangle that points the way the column is sorted. Dimmed and
+   pointing down until the column is the one in charge. */
+.sort-arrow {
+  width: 0;
+  height: 0;
+  flex: 0 0 auto;
+  border-inline: 3.5px solid transparent;
+  border-top: 4.5px solid currentColor;
+  opacity: 0.22;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.sort-button:hover .sort-arrow { opacity: 0.5; }
+.sort-arrow.desc, .sort-arrow.asc { opacity: 1; }
+.sort-arrow.asc { transform: rotate(180deg); }
+
+/* ── Chat ──────────────────────────────────────────────────────────── */
+
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.chat-composer.compact {
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+}
+.chat-composer textarea {
+  resize: vertical;
+  min-height: 60px;
+  line-height: 1.5;
+}
+
+.chat-thread { transition: border-color 0.16s ease; }
+.chat-thread:hover { border-color: var(--line-strong); }
+
+.chat-message {
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s4);
+  align-items: flex-start;
+}
+
+.chat-body { min-width: 0; flex: 1; }
+
+.chat-meta {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s2);
+  flex-wrap: wrap;
+  margin-bottom: 3px;
+}
+
+.chat-author {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* Kept out of the way until the message is hovered or the button is
+   tabbed to, so the board is not a wall of Delete. */
+.chat-delete {
+  margin-left: auto;
+  opacity: 0;
+  color: var(--ink-3);
+  transition: opacity 0.16s ease, color 0.16s ease;
+}
+.chat-message:hover .chat-delete,
+.chat-delete:focus-visible { opacity: 1; }
+.chat-delete:hover:not(:disabled) { color: var(--down); background: transparent; }
+
+.chat-text {
+  font-size: 14.5px;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-replies {
   border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+.chat-replies .chat-message { padding-left: var(--s6); }
+.chat-replies .chat-message + .chat-message { border-top: 1px solid var(--line); }
+
+.chat-foot {
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--line);
+}
+
+/* ── Motion ────────────────────────────────────────────────────────── */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Blocks wrapped in <Reveal> start slightly low and settle as they come
+   into view. Only the first arrival animates; nothing re-plays on the way
+   back up the page. */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* The page body itself, on every navigation. */
+.shell { animation: rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.panel { transition: box-shadow 0.18s ease, border-color 0.18s ease; }
+
+button:active:not(:disabled),
+.button:active { transform: translateY(1px); }
+
+.avatar { transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1); }
+.player:hover .avatar { transform: scale(1.08); }
+
+tbody tr td { transition: background 0.14s ease; }
+
+details.panel > summary { transition: background 0.14s ease; }
+details.panel > summary:hover { background: var(--surface-sunk); }
+details.panel[open] > summary { background: var(--surface-sunk); }
+
+.notice { animation: rise 0.28s ease both; }
+
+/* ── Site footer ───────────────────────────────────────────────────── */
+
+.site-footer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--line);
+  background: var(--surface-sunk);
+}
+
+.site-footer-inner {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding-inline: var(--s5);
+  padding-block: var(--s5);
+  display: flex;
+  gap: var(--s3) var(--s5);
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
   font-size: 12.5px;
   color: var(--ink-3);
 }
 
+.site-footer-note {
+  max-width: 62ch;
+  margin-bottom: var(--s3);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.site-footer a { color: var(--ink-2); }
+.site-footer a:hover { color: var(--accent); }
+
+.byline { font-weight: 500; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+
+  /* Everything above is decoration. Anyone who has asked for less motion
+     gets the finished state immediately, never a fade they have to wait
+     out — and never a block that is still invisible. */
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .player:hover .avatar,
+  button:active:not(:disabled),
+  .button:active { transform: none !important; }
 }

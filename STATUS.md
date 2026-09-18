@@ -2,7 +2,7 @@
 
 Where the project stands, so you can pick it up without re-reading anything.
 
-Last updated: 2026-09-17
+Last updated: 2026-09-18
 
 ## State
 
@@ -22,7 +22,8 @@ Nothing is connected yet: no Firebase project, no Vercel project, no data.
 5. **`npm run dev`**, sign in once, then **`npm run seed -- --admin your@email.com`** to make
    yourself admin.
 6. **`firebase deploy --only firestore:rules`** — easy to forget, and without it Firestore denies
-   everything.
+   everything. The rules now also cover `chat/` and the profile photo cap, so a stale deploy makes
+   the Chat tab and picture upload fail with a permission error rather than anything clearer.
 7. **Import the repo on Vercel**, add the same environment variables, deploy.
 8. **Firebase → Authentication → Settings → Authorized domains** — add the Vercel domain, or
    sign-in fails silently.

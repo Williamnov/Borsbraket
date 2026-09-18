@@ -1,17 +1,36 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { direction, displayName, formatPercent } from "@/lib/format";
+import type { SortDirection } from "@/lib/scoring";
 import type { Profile } from "@/lib/types";
 
-export function Avatar({ profile, large }: { profile: Profile | null | undefined; large?: boolean }) {
+export function Avatar({
+  profile,
+  large,
+  size,
+}: {
+  profile: Profile | null | undefined;
+  large?: boolean;
+  size?: "lg" | "xl";
+}) {
   const color = profile?.color ?? 1;
+  const scale = size ?? (large ? "lg" : null);
+  const photo = profile?.photoUrl;
+
   return (
-    <span className={`avatar c${color}${large ? " lg" : ""}`} aria-hidden="true">
-      {profile?.emoji ?? "📈"}
+    <span className={`avatar c${color}${scale ? ` ${scale}` : ""}`} aria-hidden="true">
+      {photo ? (
+        // A data URL from the player's own upload. next/image would need a
+        // loader and gains nothing here: the bytes are already inline and
+        // already resized.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={photo} alt="" />
+      ) : (
+        (profile?.emoji ?? "📈")
+      )}
     </span>
   );
 }
@@ -164,11 +183,87 @@ export function PageHead({
   );
 }
 
-export function Footer() {
+/**
+ * A clickable column heading. The arrow only appears on the column that
+ * is actually doing the sorting, so the header row stays quiet.
+ */
+export function SortHeader<T extends string>({
+  column,
+  active,
+  direction: dir,
+  onSort,
+  align,
+  children,
+}: {
+  column: T;
+  active: T;
+  direction: SortDirection;
+  onSort: (column: T) => void;
+  align?: "right" | "center";
+  children: ReactNode;
+}) {
+  const isActive = column === active;
   return (
-    <footer className="footer">
-      Returns are equal-weighted across your holdings, measured in each stock&rsquo;s own currency,
-      excluding dividends and currency moves. <Link href="/instructions">Full rules</Link>.
-    </footer>
+    <th
+      className={`sortable${align ? ` ${align}` : ""}${isActive ? " is-sorted" : ""}`}
+      aria-sort={isActive ? (dir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <button type="button" className="sort-button" onClick={() => onSort(column)}>
+        <span>{children}</span>
+        <span className={`sort-arrow${isActive ? ` ${dir}` : ""}`} aria-hidden="true" />
+      </button>
+    </th>
+  );
+}
+
+/**
+ * Fades a block in the first time it reaches the viewport, once only —
+ * nothing re-plays on the way back up the page.
+ *
+ * The block starts transparent, so the two ways that could strand it are
+ * both closed: `prefers-reduced-motion` pins it visible in CSS, and a
+ * <noscript> block in the layout does the same when no script runs.
+ */
+export function Reveal({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || shown) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setShown(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.05 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [shown]);
+
+  return (
+    <div
+      ref={ref}
+      className={`reveal${shown ? " is-visible" : ""}${className ? ` ${className}` : ""}`}
+      style={delay ? { transitionDelay: `${delay}ms` } : undefined}
+    >
+      {children}
+    </div>
   );
 }

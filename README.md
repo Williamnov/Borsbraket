@@ -115,7 +115,8 @@ and response shapes differ per vendor, and a guessed shape fails silently at 06:
 ## Data model
 
 ```
-profiles/{uid}                          status, isAdmin, alias, emoji, colour, motto
+profiles/{uid}                          status, isAdmin, alias, emoji, colour, motto, photoUrl
+chat/{messageId}                        the message board — uid, body, parentId, createdAt
 markets/{code}                          the pickable lists
 instruments/{marketCode_SYMBOL}         symbol, name, currency, eligible, isBenchmark
 settings/league                         league-wide settings
@@ -139,7 +140,17 @@ The repository is public, so the split matters:
   script.
 - `.gitignore` blocks `.env*`, keys and certificates, cloud credentials, database dumps and CSV
   exports. Add to it before committing anything new.
-- No player data is in the repository. Emails, picks and results live only in Firestore.
+- No player data is in the repository. Emails, picks, messages and results live only in Firestore.
+- **Profile pictures** are resized in the browser and stored as data URLs on the profile document,
+  not in Cloud Storage. That keeps one access-control story instead of two, but it also means every
+  approved player downloads every other player's picture with the league table — the rules cap each
+  one at 200 KB. Nothing is public: an unapproved account cannot read a single profile but its own.
+- **The message board** is readable and writable only by approved players. Messages cannot be
+  edited after posting — by anyone, including admins — so a thread cannot be rewritten underneath
+  the replies. Authors and admins can delete.
+- **The admin panel** is hidden from the navigation, redirects non-admins, and — the part that
+  matters — is backed by `isAdmin()` on every admin write in the rules. The first two are
+  convenience; the third is the control.
 
 If a service account key ever leaks, revoke it in **Firebase console → Project settings → Service
 accounts** and generate a new one; nothing in this repository needs changing.

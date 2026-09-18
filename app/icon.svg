@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Transparent background on purpose: the mark sits on whatever the
+       browser tab or bookmark bar happens to be. The embedded media query
+       lifts the green so it stays legible on a dark tab strip. -->
+  <style>
+    .mark { fill: #0d5c45; }
+    @media (prefers-color-scheme: dark) { .mark { fill: #34c194; } }
+  </style>
+  <g class="mark">
+    <rect x="3" y="18" width="7" height="11" rx="2" opacity="0.4" />
+    <rect x="12.5" y="12" width="7" height="17" rx="2" opacity="0.68" />
+    <rect x="22" y="3" width="7" height="26" rx="2" />
+  </g>
+</svg>

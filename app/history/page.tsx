@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Empty, Footer, PageHead, PlayerCell, RequirePlayer, Value } from "@/components/ui";
+import { Empty, PageHead, PlayerCell, RequirePlayer, Reveal, Value } from "@/components/ui";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
 import { instrumentReturn, scoreRound } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
@@ -66,7 +66,6 @@ function History() {
         <PageHead title="History">
           No month has been settled yet. Once one is, it lands here with the full table.
         </PageHead>
-        <Footer />
       </>
     );
   }
@@ -78,6 +77,7 @@ function History() {
         table and every holding.
       </PageHead>
 
+      <Reveal>
       <section className="panel" style={{ marginBottom: 20 }}>
         <header>
           <h2>Record book</h2>
@@ -117,9 +117,10 @@ function History() {
           </div>
         </div>
       </section>
+      </Reveal>
 
       <div className="stack-sm">
-        {settled.map((round) => {
+        {settled.map((round, index) => {
           const entries = scoredByRound.get(round.id) ?? [];
           const winner = entries[0];
           const bundle = bundles.get(round.id);
@@ -129,7 +130,8 @@ function History() {
             .filter((b) => b.ret !== null);
 
           return (
-            <details key={round.id} className="panel">
+            <Reveal key={round.id} delay={Math.min(index, 5) * 50}>
+            <details className="panel">
               <summary
                 style={{
                   padding: "14px 18px",
@@ -203,11 +205,10 @@ function History() {
                 </table>
               </div>
             </details>
+            </Reveal>
           );
         })}
       </div>
-
-      <Footer />
     </>
   );
 }

@@ -77,6 +77,20 @@ export function formatDateTime(value: string | null | undefined): string {
   });
 }
 
+/**
+ * "4m", "3h", "2d", then an actual date. Short enough to sit next to a
+ * name on the message board without wrapping.
+ */
+export function timeAgo(date: Date | null, now = new Date()): string {
+  if (!date) return "just now";
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (seconds < 45) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86_400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604_800) return `${Math.floor(seconds / 86_400)}d ago`;
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
 /** Player-facing name. Falls back to the local part of the email. */
 export function displayName(profile: { alias?: string | null; email?: string } | null): string {
   if (!profile) return "Player";

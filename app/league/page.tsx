@@ -1,11 +1,26 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { Empty, Footer, PageHead, PlayerCell, RequirePlayer, Value, WeekBars } from "@/components/ui";
+import {
+  Empty,
+  PageHead,
+  PlayerCell,
+  RequirePlayer,
+  Reveal,
+  SortHeader,
+  Value,
+  WeekBars,
+} from "@/components/ui";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
-import { buildSeason, scoreRound, sortSeason, type SeasonSort } from "@/lib/scoring";
-import { shortMonth } from "@/lib/format";
+import {
+  buildSeason,
+  scoreRound,
+  sortSeason,
+  type SeasonSort,
+  type SortDirection,
+} from "@/lib/scoring";
+import { displayName, shortMonth } from "@/lib/format";
 import type { ScoredEntry } from "@/lib/types";
 
 export default function LeaguePage() {
@@ -16,17 +31,26 @@ export default function LeaguePage() {
   );
 }
 
-const SORTS: { value: SeasonSort; label: string }[] = [
-  { value: "points", label: "Points" },
-  { value: "cumulative", label: "Compounded return" },
-  { value: "average", label: "Average month" },
-  { value: "wins", label: "Monthly wins" },
-];
-
 function LeagueTable() {
   const { profile } = useAuth();
   const { profiles, profileMap, rounds, loading } = useLeagueBase(true);
   const [sortBy, setSortBy] = useState<SeasonSort>("points");
+  const [direction, setDirection] = useState<SortDirection>("desc");
+
+  // Clicking the active column flips it; clicking another one starts from
+  // the end of that column that people actually want to see first —
+  // biggest number, or A first for names.
+  const onSort = useCallback(
+    (column: SeasonSort) => {
+      if (column === sortBy) {
+        setDirection((d) => (d === "desc" ? "asc" : "desc"));
+      } else {
+        setSortBy(column);
+        setDirection(column === "player" ? "asc" : "desc");
+      }
+    },
+    [sortBy],
+  );
 
   const settledIds = useMemo(
     () => rounds.filter((r) => r.status === "settled").map((r) => r.id),
@@ -49,109 +73,141 @@ function LeagueTable() {
     return sortSeason(
       rows.filter((r) => r.played > 0 || r.points > 0),
       sortBy,
+      direction,
+      (uid) => displayName(profileMap.get(uid) ?? null),
     );
-  }, [rounds, bundles, profiles, sortBy]);
+  }, [rounds, bundles, profiles, profileMap, sortBy, direction]);
 
   if (loading || bundlesLoading) return <Empty>Loading the table…</Empty>;
 
   const settledCount = settledIds.length;
+  // Standings only mean anything in the default order. Sorted any other
+  // way the leading column is a row number, not a position.
+  const ranked = sortBy === "points" && direction === "desc";
 
   return (
     <>
-      <PageHead
-        title="Season table"
-        action={
-          <label className="row" style={{ gap: 8 }}>
-            <span className="label">Sort by</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SeasonSort)}
-              style={{ width: "auto" }}
-            >
-              {SORTS.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        }
-      >
+      <PageHead title="Season table">
         {settledCount === 0
           ? "No month has been settled yet. The table fills in once the first one closes."
-          : `${settledCount} ${settledCount === 1 ? "month" : "months"} settled. Points are 10/7/5/4/3/2, then 1 for everyone else who submitted.`}
+          : `${settledCount} ${settledCount === 1 ? "month" : "months"} settled. Points are 10/7/5/4/3/2, then 1 for everyone else who submitted. Click a column to sort by it.`}
       </PageHead>
 
-      <section className="panel">
-        <div className="panel-body flush table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th className="center">#</th>
-                <th>Player</th>
-                <th className="center">Months</th>
-                <th>Form</th>
-                <th className="right">Average</th>
-                <th className="right">Compounded</th>
-                <th className="right">Wins</th>
-                <th className="right">Points</th>
-              </tr>
-            </thead>
-            <tbody>
-              {season.length === 0 ? (
+      <Reveal>
+        <section className="panel">
+          <div className="panel-body flush table-scroll">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={8}>
-                    <Empty>Nothing to rank yet.</Empty>
-                  </td>
+                  <th className="center">#</th>
+                  <SortHeader column="player" active={sortBy} direction={direction} onSort={onSort}>
+                    Player
+                  </SortHeader>
+                  <SortHeader
+                    column="played"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="center"
+                  >
+                    Months
+                  </SortHeader>
+                  <th>Form</th>
+                  <SortHeader
+                    column="average"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Average
+                  </SortHeader>
+                  <SortHeader
+                    column="cumulative"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Compounded
+                  </SortHeader>
+                  <SortHeader
+                    column="wins"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Wins
+                  </SortHeader>
+                  <SortHeader
+                    column="points"
+                    active={sortBy}
+                    direction={direction}
+                    onSort={onSort}
+                    align="right"
+                  >
+                    Points
+                  </SortHeader>
                 </tr>
-              ) : (
-                season.map((row, index) => {
-                  const position = index + 1;
-                  return (
-                    <tr key={row.uid} className={row.uid === profile?.uid ? "is-me" : undefined}>
-                      <td className={`rank${position <= 3 ? ` r${position}` : ""}`}>{position}</td>
-                      <td>
-                        <PlayerCell
-                          profile={profileMap.get(row.uid)}
-                          you={row.uid === profile?.uid}
-                          withMotto
-                        />
-                      </td>
-                      <td className="center mono">{row.played}</td>
-                      <td>
-                        <WeekBars
-                          unit="Month"
-                          path={row.monthly.slice(-6).map((m) => m.ret)}
-                          labels={row.monthly.slice(-6).map((m) => shortMonth(m.roundId))}
-                        />
-                      </td>
-                      <td className="right">
-                        <Value value={row.average} />
-                      </td>
-                      <td className="right">
-                        <Value value={row.cumulative} />
-                      </td>
-                      <td className="right mono">{row.wins}</td>
-                      <td className="right">
-                        <span className="value">{row.points}</span>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {season.length === 0 ? (
+                  <tr>
+                    <td colSpan={8}>
+                      <Empty>Nothing to rank yet.</Empty>
+                    </td>
+                  </tr>
+                ) : (
+                  season.map((row, index) => {
+                    const position = index + 1;
+                    return (
+                      <tr key={row.uid} className={row.uid === profile?.uid ? "is-me" : undefined}>
+                        <td className={`rank${ranked && position <= 3 ? ` r${position}` : ""}`}>
+                          {position}
+                        </td>
+                        <td>
+                          <PlayerCell
+                            profile={profileMap.get(row.uid)}
+                            you={row.uid === profile?.uid}
+                            withMotto
+                          />
+                        </td>
+                        <td className="center mono">{row.played}</td>
+                        <td>
+                          <WeekBars
+                            unit="Month"
+                            path={row.monthly.slice(-6).map((m) => m.ret)}
+                            labels={row.monthly.slice(-6).map((m) => shortMonth(m.roundId))}
+                          />
+                        </td>
+                        <td className="right">
+                          <Value value={row.average} />
+                        </td>
+                        <td className="right">
+                          <Value value={row.cumulative} />
+                        </td>
+                        <td className="right mono">{row.wins}</td>
+                        <td className="right">
+                          <span className="value">{row.points}</span>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </Reveal>
 
       {season.length > 0 && settledCount > 0 ? (
         <p className="hint" style={{ marginTop: 12 }}>
           Form shows the last {Math.min(6, settledCount)} settled months, most recent on the right.
           Hover a bar for the figure.
+          {ranked ? "" : " Sorted by a column other than points, so # is a row number."}
         </p>
       ) : null}
-
-      <Footer />
     </>
   );
 }

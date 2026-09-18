@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           emoji: "📈",
           color: 1,
           motto: null,
+          photoUrl: null,
           status: "pending",
           isAdmin: false,
           createdAt: serverTimestamp(),

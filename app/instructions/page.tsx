@@ -152,6 +152,14 @@ export default function InstructionsPage() {
         the price in, the table catches up on its own.
       </p>
 
+      <h2>Chat</h2>
+      <p>
+        The <Link href="/chat">Chat</Link> tab is the league&rsquo;s message board: threads with one
+        level of replies, visible to every approved player. A posted message cannot be edited by
+        anyone, so nobody gets to rewrite a call after the fact — you can delete your own, and
+        admins can delete anything. None of it touches the scoring.
+      </p>
+
       <p style={{ marginTop: 36 }}>
         <Link href="/login">Sign in</Link> to join, or head back to the{" "}
         <Link href="/league">league table</Link>.

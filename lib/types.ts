@@ -22,11 +22,40 @@ export type Profile = {
   emoji: string;
   color: number;
   motto: string | null;
+  /**
+   * A square JPEG data URL, resized in the browser before it is saved.
+   * Null means the emoji is used instead. Stored on the profile document
+   * rather than in Cloud Storage: the images are a few tens of kilobytes,
+   * every reader of the league table already reads this document, and it
+   * keeps the whole access story inside firestore.rules.
+   */
+  photoUrl: string | null;
   status: ProfileStatus;
   isAdmin: boolean;
   createdAt?: Instant;
   approvedAt?: Instant;
 };
+
+/** The hard ceiling the rules also enforce, in characters of data URL. */
+export const MAX_PHOTO_CHARS = 200_000;
+
+/**
+ * chat/{messageId} — the league's message board.
+ *
+ * One flat collection with a single level of replies: `parentId` is null
+ * for a new thread and the thread's id for a reply. Flat keeps the whole
+ * board readable in one subscription.
+ */
+export type ChatMessage = {
+  id: string;
+  uid: string;
+  body: string;
+  parentId: string | null;
+  createdAt?: Instant;
+};
+
+/** Matches the ceiling firestore.rules enforces. */
+export const MAX_MESSAGE_CHARS = 2000;
 
 export type Market = {
   code: string;

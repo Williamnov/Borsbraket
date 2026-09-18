@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
-import { Avatar, Empty, Footer, PageHead, Panel, RequirePlayer, Value } from "@/components/ui";
+import { Avatar, Empty, PageHead, Panel, RequirePlayer, Reveal, Value } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
 import { useLeagueBase, useRoundBundles } from "@/lib/hooks";
 import { buildSeason, scoreRound } from "@/lib/scoring";
 import { displayName } from "@/lib/format";
-import type { ScoredEntry } from "@/lib/types";
+import { MAX_PHOTO_CHARS, type ScoredEntry } from "@/lib/types";
 
 const EMOJI = [
   "📈", "📉", "🦊", "🐻", "🐂", "🚀", "🧊", "🎲", "🦅", "🐺",
@@ -18,6 +18,43 @@ const EMOJI = [
 ];
 
 const COLORS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+/** The avatar is never shown larger than 88px, so 256 covers retina. */
+const PHOTO_SIZE = 256;
+const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic"];
+
+/**
+ * Read a file the player chose, crop it square from the centre, scale it
+ * to PHOTO_SIZE and hand back a JPEG data URL.
+ *
+ * Doing this in the browser is what makes storing the image on the
+ * profile document reasonable: a 4 MB phone photo comes back at roughly
+ * 20 KB, and nothing but the resized copy ever leaves the device.
+ */
+async function toSquareDataUrl(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  try {
+    const side = Math.min(bitmap.width, bitmap.height);
+    const sx = (bitmap.width - side) / 2;
+    const sy = (bitmap.height - side) / 2;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = PHOTO_SIZE;
+    canvas.height = PHOTO_SIZE;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This browser would not give us a canvas to resize with.");
+    context.drawImage(bitmap, sx, sy, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE);
+
+    // Step the quality down until it fits what the rules will accept.
+    for (const quality of [0.82, 0.7, 0.6, 0.5, 0.4]) {
+      const url = canvas.toDataURL("image/jpeg", quality);
+      if (url.length <= MAX_PHOTO_CHARS) return url;
+    }
+    throw new Error("That image would not compress small enough. Try a simpler picture.");
+  } finally {
+    bitmap.close();
+  }
+}
 
 export default function ProfilePage() {
   return (
@@ -35,8 +72,10 @@ function ProfileEditor() {
   const [motto, setMotto] = useState(profile?.motto ?? "");
   const [emoji, setEmoji] = useState(profile?.emoji ?? "📈");
   const [color, setColor] = useState(profile?.color ?? 1);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.photoUrl ?? null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const settledIds = useMemo(
     () => rounds.filter((r) => r.status === "settled").map((r) => r.id),
@@ -55,9 +94,34 @@ function ProfileEditor() {
   }, [rounds, bundles, profiles, profile?.uid]);
 
   const preview = useMemo(
-    () => (profile ? { ...profile, alias, motto, emoji, color } : null),
-    [profile, alias, motto, emoji, color],
+    () => (profile ? { ...profile, alias, motto, emoji, color, photoUrl } : null),
+    [profile, alias, motto, emoji, color, photoUrl],
   );
+
+  async function pickPhoto(file: File | undefined) {
+    if (!file) return;
+    setMessage(null);
+
+    if (file.type && !ACCEPTED.includes(file.type)) {
+      setMessage({ kind: "bad", text: "That is not an image file." });
+      return;
+    }
+
+    setBusy(true);
+    try {
+      setPhotoUrl(await toSquareDataUrl(file));
+      setMessage({ kind: "good", text: "Picture ready — save to keep it." });
+    } catch (error) {
+      setMessage({
+        kind: "bad",
+        text: error instanceof Error ? error.message : "Could not read that image.",
+      });
+    } finally {
+      setBusy(false);
+      // Lets the same file be chosen again after a failure.
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
 
   async function save() {
     if (!profile) return;
@@ -69,6 +133,7 @@ function ProfileEditor() {
         motto: motto.trim() ? motto.trim().slice(0, 80) : null,
         emoji,
         color,
+        photoUrl,
       });
       setMessage({ kind: "good", text: "Profile saved." });
     } catch (error) {
@@ -89,12 +154,12 @@ function ProfileEditor() {
         This is how you appear in the table. Nothing here affects scoring.
       </PageHead>
 
-      <div className="grid-2">
+      <Reveal className="grid-2">
         <div className="stack-sm">
           <div className="panel">
             <div className="panel-body">
-              <div className="row" style={{ gap: 16 }}>
-                <Avatar profile={preview} large />
+              <div className="row" style={{ gap: 18 }}>
+                <Avatar profile={preview} size="xl" />
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 20 }}>
                     {displayName(preview)}
@@ -102,8 +167,42 @@ function ProfileEditor() {
                   <div className="secondary" style={{ fontSize: 13 }}>
                     {motto.trim() || "No battle cry yet"}
                   </div>
+
+                  <div className="row" style={{ gap: 8, marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="small"
+                      disabled={busy}
+                      onClick={() => fileInput.current?.click()}
+                    >
+                      {photoUrl ? "Change picture" : "Upload picture"}
+                    </button>
+                    {photoUrl ? (
+                      <button
+                        type="button"
+                        className="small quiet"
+                        disabled={busy}
+                        onClick={() => setPhotoUrl(null)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    onChange={(e) => void pickPhoto(e.target.files?.[0])}
+                  />
                 </div>
               </div>
+
+              <p className="hint" style={{ marginTop: 14 }}>
+                The picture is cropped square, scaled down in your browser and replaces the emoji
+                everywhere you appear. Everyone in the league can see it.
+              </p>
             </div>
           </div>
 
@@ -148,13 +247,14 @@ function ProfileEditor() {
 
             <div>
               <span className="label" style={{ display: "block", marginBottom: 8 }}>
-                Icon
+                Icon{photoUrl ? " — hidden while you have a picture" : ""}
               </span>
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))",
                   gap: 6,
+                  opacity: photoUrl ? 0.55 : 1,
                 }}
               >
                 {EMOJI.map((option) => (
@@ -212,9 +312,7 @@ function ProfileEditor() {
             {message ? <div className={`notice ${message.kind}`}>{message.text}</div> : null}
           </div>
         </Panel>
-      </div>
-
-      <Footer />
+      </Reveal>
     </>
   );
 }
