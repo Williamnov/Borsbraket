@@ -9,7 +9,12 @@ import { displayName } from "@/lib/format";
 import { profileDescription, type Profile } from "@/lib/types";
 
 /**
- * Find a player or a page.
+ * Find a player or a page, from the masthead.
+ *
+ * A magnifying glass that slides a field out in place rather than a
+ * dialog over the page: the search belongs to the navigation, so it
+ * stays in the navigation. It closes on Escape, on a click anywhere
+ * else, and on picking a result.
  *
  * Deliberately not a search over stocks or messages. Those want different
  * answers — a stock search belongs in the pick editor next to the list it
@@ -32,14 +37,14 @@ const PAGES: { href: string; label: string; hint: string; admin?: boolean }[] = 
   { href: "/history", label: "History", hint: "Every settled month" },
   { href: "/instructions", label: "How it works", hint: "The rules" },
   { href: "/profile", label: "Profile", hint: "Your own page" },
-  { href: "/admin", label: "Admin", hint: "Run the league" },
+  { href: "/admin", label: "Admin", hint: "Run the league", admin: true },
 ];
 
 /** Case- and accent-insensitive, so "bjorn" finds "Björn". */
 function fold(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
 }
 
@@ -52,6 +57,7 @@ export function Search() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -59,21 +65,33 @@ export function Search() {
     setActive(0);
   }, []);
 
-  // Ctrl/Cmd-K from anywhere, Escape to leave. The shortcut is ignored
-  // while typing somewhere else, so it cannot eat a chat message.
+  /**
+   * Escape closes it, and so does a click anywhere outside.
+   *
+   * Both are bound only while it is open, so the app is not listening to
+   * every click on every page for the sake of a field nobody has opened.
+   * mousedown rather than click, so pressing on the page closes it at
+   * once instead of waiting for the button to come back up.
+   */
   useEffect(() => {
+    if (!open) return;
+
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        if (canPlay) setOpen((current) => !current);
-        return;
-      }
       if (event.key === "Escape") close();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [close, canPlay]);
+    const onDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) close();
+    };
 
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [open, close]);
+
+  // Focus follows the field out, once it has somewhere to go.
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
@@ -98,11 +116,10 @@ export function Search() {
       .sort((a, b) => displayName(a).localeCompare(displayName(b), "sv", { sensitivity: "base" }))
       .map((p) => ({ kind: "player", href: `/players/${p.uid}`, profile: p }));
 
-    // Pages first on an empty query — they are what someone reaching for
-    // a keyboard shortcut usually wants — and players first once there is
-    // something to match, since a typed name is almost always a person.
+    // Pages first before anything is typed, players first once something
+    // is: a typed name is almost always a person.
     const ordered = needle === "" ? [...pages, ...players] : [...players, ...pages];
-    return ordered.slice(0, 12);
+    return ordered.slice(0, 10);
   }, [query, profiles, isAdmin]);
 
   useEffect(() => setActive(0), [query]);
@@ -127,89 +144,80 @@ export function Search() {
   }
 
   return (
-    <>
+    <div ref={rootRef} className={`search${open ? " is-open" : ""}`}>
       <button
         type="button"
         className="search-trigger"
-        onClick={() => canPlay && setOpen(true)}
-        aria-label="Search players and pages"
+        aria-label={open ? "Close search" : "Search players and pages"}
+        aria-expanded={open}
+        onClick={() => (open ? close() : canPlay && setOpen(true))}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true" className="search-icon">
           <circle cx="9" cy="9" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
           <path d="M13 13 L17 17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
-        <span className="search-trigger-label">Search</span>
-        <kbd className="search-kbd">⌘K</kbd>
       </button>
 
+      {/* Always in the markup so the field has a width to slide out from,
+          and out of the tab order while it is closed. */}
+      <input
+        ref={inputRef}
+        className="search-field"
+        value={query}
+        placeholder="Player or page…"
+        tabIndex={open ? 0 : -1}
+        aria-hidden={!open}
+        aria-label="Search players and pages"
+        onChange={(e) => setQuery(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+
       {open ? (
-        <div className="search-scrim" onMouseDown={close} role="presentation">
-          <div
-            className="search-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Search"
-            // The scrim closes on click; the panel must not pass its own
-            // clicks up to it.
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <input
-              ref={inputRef}
-              className="search-input"
-              value={query}
-              placeholder="Find a player or a page…"
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={onKeyDown}
-              aria-label="Search players and pages"
-            />
-
-            {results.length === 0 ? (
-              <p className="empty">Nothing matches “{query}”.</p>
-            ) : (
-              <ul className="search-results">
-                {results.map((target, i) => (
-                  <li key={`${target.kind}:${target.href}`}>
-                    <button
-                      type="button"
-                      className={`search-result${i === active ? " is-active" : ""}`}
-                      onMouseEnter={() => setActive(i)}
-                      onClick={() => go(target)}
-                    >
-                      {target.kind === "player" ? (
-                        <>
-                          <Avatar profile={target.profile} />
-                          <span className="search-result-text">
-                            <span className="search-result-title">
-                              {displayName(target.profile)}
-                            </span>
-                            <span className="search-result-hint">
-                              {profileDescription(target.profile) || "Player"}
-                            </span>
+        <div className="search-drop" role="listbox" aria-label="Search results">
+          {results.length === 0 ? (
+            <p className="search-none">Nothing matches “{query}”.</p>
+          ) : (
+            <ul>
+              {results.map((target, i) => (
+                <li key={`${target.kind}:${target.href}`}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={i === active}
+                    className={`search-result${i === active ? " is-active" : ""}`}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => go(target)}
+                  >
+                    {target.kind === "player" ? (
+                      <>
+                        <Avatar profile={target.profile} />
+                        <span className="search-result-text">
+                          <span className="search-result-title">
+                            {displayName(target.profile)}
                           </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="search-result-glyph" aria-hidden="true">
-                            →
+                          <span className="search-result-hint">
+                            {profileDescription(target.profile) || "Player"}
                           </span>
-                          <span className="search-result-text">
-                            <span className="search-result-title">{target.label}</span>
-                            <span className="search-result-hint">{target.hint}</span>
-                          </span>
-                        </>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p className="search-foot hint">
-              ↑↓ to move · Enter to open · Esc to close
-            </p>
-          </div>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="search-result-glyph" aria-hidden="true">
+                          →
+                        </span>
+                        <span className="search-result-text">
+                          <span className="search-result-title">{target.label}</span>
+                          <span className="search-result-hint">{target.hint}</span>
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

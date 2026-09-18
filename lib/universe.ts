@@ -1,8 +1,9 @@
 /**
  * The pickable universe.
  *
- * MARKETS covers every Nordic list plus the main North American and UK
- * exchanges. Disable a market in the admin panel to close it.
+ * MARKETS covers every Nordic list, the main North American and UK
+ * exchanges, the large continental European venues and Tokyo and Sydney.
+ * Disable a market in the admin panel to close it.
  *
  * INSTRUMENTS seeds established companies only, and only where the
  * listing is unambiguous. The Nordic growth lists (First North,
@@ -64,7 +65,58 @@ export const MARKETS: MarketSeed[] = [
   { code: "US_AMEX", name: "NYSE American", country: "United States", region: "North America", currency: "USD", sortOrder: 62 },
   { code: "CA_TSX", name: "Toronto Stock Exchange", country: "Canada", region: "North America", currency: "CAD", sortOrder: 70 },
   { code: "UK_LSE", name: "London Stock Exchange", country: "United Kingdom", region: "United Kingdom", currency: "GBP", sortOrder: 80 },
+
+  { code: "DE_XETRA", name: "Xetra", country: "Germany", region: "Europe", currency: "EUR", sortOrder: 90 },
+  { code: "FR_EPA", name: "Euronext Paris", country: "France", region: "Europe", currency: "EUR", sortOrder: 91 },
+  { code: "CH_SIX", name: "SIX Swiss Exchange", country: "Switzerland", region: "Europe", currency: "CHF", sortOrder: 92 },
+  { code: "NL_AMS", name: "Euronext Amsterdam", country: "Netherlands", region: "Europe", currency: "EUR", sortOrder: 93 },
+  { code: "ES_BME", name: "Bolsa de Madrid", country: "Spain", region: "Europe", currency: "EUR", sortOrder: 94 },
+  { code: "IT_MIL", name: "Borsa Italiana", country: "Italy", region: "Europe", currency: "EUR", sortOrder: 95 },
+
+  { code: "JP_TSE", name: "Tokyo Stock Exchange", country: "Japan", region: "Asia-Pacific", currency: "JPY", sortOrder: 110 },
+  { code: "AU_ASX", name: "Australian Securities Exchange", country: "Australia", region: "Asia-Pacific", currency: "AUD", sortOrder: 111 },
 ];
+
+/**
+ * The ISO 10383 code for each market's trading venue.
+ *
+ * Price feeds want to know which exchange a ticker belongs to — "SAN" is
+ * Sanofi in Paris and Banco Santander in Madrid, and there is no way to
+ * tell them apart from the symbol alone. Kept here beside the markets
+ * rather than in the provider, because it is a fact about the exchange
+ * and not about any particular vendor.
+ *
+ * Markets with no entry can still be picked; they simply have to be
+ * priced by hand.
+ */
+export const MARKET_MIC: Record<string, string> = {
+  SE_LARGE: "XSTO",
+  SE_MID: "XSTO",
+  SE_SMALL: "XSTO",
+  FI_LARGE: "XHEL",
+  FI_MID: "XHEL",
+  FI_SMALL: "XHEL",
+  DK_LARGE: "XCSE",
+  DK_MID: "XCSE",
+  DK_SMALL: "XCSE",
+  NO_OSE: "XOSL",
+  IS_LARGE: "XICE",
+  IS_MID: "XICE",
+  IS_SMALL: "XICE",
+  US_NYSE: "XNYS",
+  US_NASDAQ: "XNAS",
+  US_AMEX: "XASE",
+  CA_TSX: "XTSE",
+  UK_LSE: "XLON",
+  DE_XETRA: "XETR",
+  FR_EPA: "XPAR",
+  CH_SIX: "XSWX",
+  NL_AMS: "XAMS",
+  ES_BME: "XMAD",
+  IT_MIL: "XMIL",
+  JP_TSE: "XJPX",
+  AU_ASX: "XASX",
+};
 
 function list(marketCode: string, currency: string, rows: [string, string][]): InstrumentSeed[] {
   return rows.map(([symbol, name]) => ({ symbol, name, marketCode, currency }));
@@ -194,6 +246,87 @@ export const INSTRUMENTS: InstrumentSeed[] = [
     ["STAN", "Standard Chartered"], ["SVT", "Severn Trent"], ["TSCO", "Tesco"],
     ["ULVR", "Unilever"], ["UU", "United Utilities Group"], ["VOD", "Vodafone Group"],
     ["WPP", "WPP"], ["WTB", "Whitbread"],
+  ]),
+
+  // ── Continental Europe and Asia-Pacific ─────────────────────────────
+  // Every ticker below was checked against the price feed's catalogue
+  // before being added: a name nobody can price is worse than a name
+  // nobody can pick, because it fails silently halfway through a month.
+  // Companies that trade in two of these markets appear once, in their
+  // primary listing — Airbus in Paris, Stellantis in Paris.
+
+  ...list("DE_XETRA", "EUR", [
+    ["SAP", "SAP"], ["SIE", "Siemens"], ["ALV", "Allianz"], ["DTE", "Deutsche Telekom"],
+    ["MBG", "Mercedes-Benz Group"], ["BMW", "BMW"], ["BAS", "BASF"], ["BAYN", "Bayer"],
+    ["ADS", "Adidas"], ["MUV2", "Münchener Rück"], ["DBK", "Deutsche Bank"], ["RWE", "RWE"],
+    ["VOW3", "Volkswagen Pref"], ["IFX", "Infineon Technologies"], ["HEN3", "Henkel Pref"],
+    ["DHL", "DHL Group"], ["MRK", "Merck KGaA"], ["EOAN", "E.ON"], ["ZAL", "Zalando"],
+    ["P911", "Porsche AG"], ["SHL", "Siemens Healthineers"], ["VNA", "Vonovia"],
+    ["BEI", "Beiersdorf"], ["DB1", "Deutsche Börse"],
+  ]),
+
+  ...list("FR_EPA", "EUR", [
+    ["MC", "LVMH"], ["OR", "L'Oréal"], ["TTE", "TotalEnergies"], ["SAN", "Sanofi"],
+    ["AIR", "Airbus"], ["SU", "Schneider Electric"], ["BNP", "BNP Paribas"],
+    ["AI", "Air Liquide"], ["EL", "EssilorLuxottica"], ["DG", "Vinci"], ["CS", "AXA"],
+    ["RMS", "Hermès International"], ["KER", "Kering"], ["SGO", "Saint-Gobain"],
+    ["CAP", "Capgemini"], ["ACA", "Crédit Agricole"], ["VIE", "Veolia"], ["ORA", "Orange"],
+    ["STLAP", "Stellantis"], ["RI", "Pernod Ricard"], ["BN", "Danone"], ["ML", "Michelin"],
+    ["PUB", "Publicis Groupe"], ["LR", "Legrand"], ["ENGI", "Engie"],
+  ]),
+
+  ...list("CH_SIX", "CHF", [
+    ["NESN", "Nestlé"], ["NOVN", "Novartis"], ["RO", "Roche Holding"],
+    ["ZURN", "Zurich Insurance"], ["UBSG", "UBS Group"], ["ABBN", "ABB Ltd"],
+    ["CFR", "Richemont"], ["SIKA", "Sika"], ["LONN", "Lonza Group"], ["GIVN", "Givaudan"],
+    ["SGSN", "SGS"], ["HOLN", "Holcim"], ["SCMN", "Swisscom"], ["GEBN", "Geberit"],
+    ["SREN", "Swiss Re"], ["ALC", "Alcon"], ["PGHN", "Partners Group"],
+    ["BAER", "Julius Bär"], ["STMN", "Straumann"], ["KNIN", "Kühne+Nagel"],
+  ]),
+
+  ...list("NL_AMS", "EUR", [
+    ["ASML", "ASML Holding"], ["INGA", "ING Groep"], ["AD", "Ahold Delhaize"],
+    ["PHIA", "Philips"], ["HEIA", "Heineken"], ["WKL", "Wolters Kluwer"],
+    ["AKZA", "Akzo Nobel"], ["DSFIR", "DSM-Firmenich"], ["RAND", "Randstad"], ["KPN", "KPN"],
+    ["ASM", "ASM International"], ["BESI", "BE Semiconductor"], ["AGN", "Aegon"],
+    ["NN", "NN Group"], ["IMCD", "IMCD"], ["ADYEN", "Adyen"], ["PRX", "Prosus"],
+    ["UMG", "Universal Music Group"], ["ABN", "ABN AMRO"],
+  ]),
+
+  ...list("ES_BME", "EUR", [
+    ["ITX", "Inditex"], ["IBE", "Iberdrola"], ["SAN", "Banco Santander"], ["BBVA", "BBVA"],
+    ["AENA", "Aena"], ["TEF", "Telefónica"], ["REP", "Repsol"], ["FER", "Ferrovial"],
+    ["AMS", "Amadeus IT Group"], ["CLNX", "Cellnex Telecom"], ["ELE", "Endesa"], ["ACS", "ACS"],
+    ["GRF", "Grifols"], ["RED", "Redeia"], ["MAP", "Mapfre"],
+  ]),
+
+  ...list("IT_MIL", "EUR", [
+    ["ENEL", "Enel"], ["ISP", "Intesa Sanpaolo"], ["ENI", "Eni"], ["UCG", "UniCredit"],
+    ["RACE", "Ferrari"], ["G", "Assicurazioni Generali"], ["PRY", "Prysmian"],
+    ["MONC", "Moncler"], ["TIT", "Telecom Italia"], ["MB", "Mediobanca"], ["TRN", "Terna"],
+    ["SRG", "Snam"], ["BAMI", "Banco BPM"], ["PST", "Poste Italiane"], ["LDO", "Leonardo"],
+    ["CPR", "Davide Campari-Milano"],
+  ]),
+
+  // Tokyo quotes by four-digit code rather than letters; the name is what
+  // the pick editor searches on.
+  ...list("JP_TSE", "JPY", [
+    ["7203", "Toyota Motor"], ["6758", "Sony Group"], ["8306", "Mitsubishi UFJ Financial"],
+    ["9984", "SoftBank Group"], ["6861", "Keyence"], ["7974", "Nintendo"],
+    ["8035", "Tokyo Electron"], ["4063", "Shin-Etsu Chemical"], ["9432", "NTT"],
+    ["6098", "Recruit Holdings"], ["8058", "Mitsubishi Corporation"], ["6501", "Hitachi"],
+    ["4502", "Takeda Pharmaceutical"], ["7267", "Honda Motor"], ["6902", "Denso"],
+    ["8001", "Itochu"], ["9433", "KDDI"], ["6367", "Daikin Industries"],
+    ["4568", "Daiichi Sankyo"], ["8316", "Sumitomo Mitsui Financial"],
+  ]),
+
+  ...list("AU_ASX", "AUD", [
+    ["BHP", "BHP Group"], ["CBA", "Commonwealth Bank of Australia"], ["CSL", "CSL"],
+    ["NAB", "National Australia Bank"], ["WBC", "Westpac Banking"], ["ANZ", "ANZ Group"],
+    ["WES", "Wesfarmers"], ["MQG", "Macquarie Group"], ["WOW", "Woolworths Group"],
+    ["TLS", "Telstra Group"], ["RIO", "Rio Tinto"], ["FMG", "Fortescue"],
+    ["ALL", "Aristocrat Leisure"], ["WDS", "Woodside Energy"], ["COL", "Coles Group"],
+    ["STO", "Santos"], ["QAN", "Qantas Airways"], ["REA", "REA Group"],
   ]),
 
   // Priced alongside the picks for comparison, never pickable.
