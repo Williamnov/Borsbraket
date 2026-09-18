@@ -13,10 +13,13 @@ anything.
 - **Picks lock** a few days into the month. After that, nothing moves.
 - **Sealed until the lock** — other players' picks are not sent to your browser at all while the
   month is open. That is enforced in `firestore.rules`, not hidden in the interface.
-- **Prices four times a month**, once a week, measured against an opening price.
+- **Prices four times a month**, once a week, measured from a baseline taken *at the lock* —
+  not at the start of the month. Measuring from the 1st would hand whoever submits last three
+  days of hindsight; sealing and measuring at the same instant gives everyone one starting price.
 - **Points**: 10 / 7 / 5 / 4 / 3 / 2, then 1 for everyone else who submitted.
-- **Eligible markets**: every Nordic list (Sweden, Finland, Denmark, Norway, Iceland), plus NYSE,
-  Nasdaq, NYSE American, the Toronto Stock Exchange and the London main market.
+- **Eligible markets**: every Nordic list (Sweden, Finland, Denmark, Norway, Iceland), the main
+  North American and UK markets, the large continental European venues (Xetra, Paris, SIX,
+  Amsterdam, Madrid, Milan) and Tokyo and Sydney.
 - **No penny stocks.** Only instruments an admin has marked eligible can be picked, and that is
   checked when picks are saved. The filter is company size, not share price.
 
@@ -82,9 +85,10 @@ Your email is passed on the command line rather than stored in the repo.
 2. Add every variable from `.env.local` under **Settings → Environment Variables**. For
    `FIREBASE_PRIVATE_KEY`, paste the whole quoted string including the `\n` sequences.
 3. Deploy.
-4. `vercel.json` already registers the weekly cron (Mondays 06:00 UTC). Cron jobs need a Pro plan;
-   on Hobby, trigger the same endpoint from any scheduler with an
-   `Authorization: Bearer <CRON_SECRET>` header.
+4. `vercel.json` registers a **daily** cron at 06:00 UTC, which is within Hobby's limits. It is a
+   backstop: the real price job runs in GitHub Actions (see **Prices**). Daily rather than
+   weekly because what gets recorded is decided by the round's clock, and the lock is rarely a
+   Monday.
 5. Go back to Firebase and add the deployed domain to **Authorized domains**.
 
 ## Running a month
@@ -93,8 +97,10 @@ From the **Admin** page:
 
 1. **Open next month** — creates the round with sensible dates (opens on the 1st, locks on the 4th).
 2. Players submit picks before the lock.
-3. Enter the **opening price** for every held ticker in the weekly price grid, or let the cron do it.
-4. Each week, fill in that week's column — type into the grid or paste a block of
+3. The **baseline** is recorded automatically on the first run at or after the lock. Each column
+   in the price grid carries the date it is due, so entering one by hand means the same thing
+   the job means by it.
+4. Each week, fill in anything the feed could not price — type into the grid or paste a block of
    `TICKER price` lines into the chosen week.
 5. **Settle month** at the end. Points are awarded and the month moves to History.
 
@@ -103,29 +109,44 @@ portfolio as partly priced until they arrive.
 
 ## Prices
 
-There is no price feed wired up. `PRICE_PROVIDER=manual` is the default: the weekly cron still
-runs, still logs to the `priceRuns` collection, and still reports which tickers are waiting, but the
-figures are typed into the admin panel.
+Prices come from [Twelve Data](https://twelvedata.com), whose free tier covers every market in the
+universe above — all five Nordic exchanges included, which is the part most free feeds do not.
 
-To automate it, implement `httpProvider.fetchQuotes` in [`lib/prices/index.ts`](lib/prices/index.ts)
-against whichever vendor you use, put the credentials in `PRICE_API_KEY` / `PRICE_API_BASE_URL`, and
-set `PRICE_PROVIDER=http`. The interface is four lines; the reason it ships empty is that request
-and response shapes differ per vendor, and a guessed shape fails silently at 06:00 on a Monday.
+**The job runs in GitHub Actions, not on Vercel.** Twelve Data's free tier allows eight symbols a
+minute and each symbol costs one credit, so thirty instruments take about four minutes of paced
+requests, and a Vercel Hobby function is killed at sixty seconds. Running it in Actions also
+sidesteps Hobby's daily-only cron schedules, sends an email when a run fails — which is the alert a
+job whose failure mode is silence badly needs — and keeps the Twelve Data key in GitHub while the
+Firebase key stays in Vercel, so neither service holds both.
+
+Set three repository secrets to switch it on: `SITE_URL`, `CRON_SECRET` (the same value as Vercel's)
+and `TWELVEDATA_API_KEY`. Until they exist the workflow exits green and says so, and prices are
+typed into the admin panel as before.
+
+The split keeps the decisions in one place. `GET /api/cron/weekly-prices?plan=1` says what is
+needed, `POST` takes prices someone else fetched, and the script in
+[`scripts/fetch-prices.mjs`](scripts/fetch-prices.mjs) is deliberately ignorant: it is handed symbols
+with their exchange codes and hands back numbers. Which checkpoint a price belongs to, and whether it
+may be written at all, is decided by the route — and a quote for something the run did not ask for is
+dropped, so a replayed request cannot rewrite a checkpoint that is already final.
+
+Stooq was the obvious free alternative and is not usable: it now gates every endpoint behind a
+JavaScript proof-of-work challenge.
 
 ## Data model
 
 ```
-profiles/{uid}                          status, isAdmin, handle, alias, emoji, colour, motto, photoUrl
+profiles/{uid}                          status, isAdmin, handle, alias, description, icon, photoUrl, chatReadAt
 contacts/{uid}                          the sign-in address — owner and admins only
 rateLimits/{uid}                        how fast one player may post; written with each message
 chat/{messageId}                        the message board — uid, body, parentId, createdAt
 markets/{code}                          the pickable lists
 instruments/{marketCode_SYMBOL}         symbol, name, currency, eligible, isBenchmark
 settings/league                         league-wide settings
-rounds/{YYYY-MM}                        dates, picksPerRound, status
+rounds/{YYYY-MM}                        dates, picksPerRound, status, announcedOpen/Lock
 rounds/{YYYY-MM}/picks/{uid}            picks keyed by instrument id — sealed until the lock
 rounds/{YYYY-MM}/submissions/{uid}      that you picked and how many, never what
-rounds/{YYYY-MM}/prices/{instrumentId}  w0 (opening) plus w1-w4 weekly checkpoints
+rounds/{YYYY-MM}/prices/{instrumentId}  w0 (baseline, at the lock) plus w1-w4 weekly checkpoints
 priceRuns/{id}                          one row per cron run, so a missed week is visible
 ```
 
@@ -138,7 +159,7 @@ The repository is public, so the split matters:
   [`firestore.rules`](firestore.rules). Review that file, not the API key.
 - **Real secrets**: `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL` and `CRON_SECRET`. These live in
   Vercel's environment variables and in `.env.local`, both of which are git-ignored. The service
-  account bypasses all rules and is used by exactly two callers: the weekly cron and the seed
+  account bypasses all rules and is used by exactly two callers: the price route and the seed
   script.
 - `.gitignore` blocks `.env*`, keys and certificates, cloud credentials, database dumps and CSV
   exports. Add to it before committing anything new.
@@ -151,15 +172,23 @@ The repository is public, so the split matters:
 - **The board is rate-limited** at ten seconds between messages and sixty an hour, per player.
   Firestore rules cannot count documents, so the counter is a document: a message is only accepted
   as part of a transaction that also stamps `rateLimits/{uid}`, and the rules on that row are what
-  set the pace. Admins are exempt, deliberately — they can already delete the whole board.
-- **A Content-Security-Policy** is built per request in [`middleware.ts`](middleware.ts), with a
-  nonce for Next's inline bootstrap scripts. `style-src` still allows inline styles, because the
-  pages use React `style={{…}}` attributes throughout and CSP counts those as inline styles;
-  scripts, which are what matter, are nonce-gated.
-- **Profile pictures** are resized in the browser and stored as data URLs on the profile document,
-  not in Cloud Storage. That keeps one access-control story instead of two, but it also means every
-  approved player downloads every other player's picture with the league table — the rules cap each
-  one at 200 KB. Nothing is public: an unapproved account cannot read a single profile but its own.
+  set the pace. Admins get read and delete on that row but **not** write: a blanket write let an
+  admin stamp their own counter and post as fast as they liked, because the chat rule checks that the
+  counter was written, not that it was written honestly.
+- **A Content-Security-Policy** is set in [`middleware.ts`](middleware.ts), currently **report-only**
+  — violations post to `/api/csp-report` and land in the Vercel logs. Set `CSP_ENFORCE=1` once a full
+  session produces none. It carries no nonce, deliberately: every page here is prerendered, and Next
+  only stamps nonces onto pages it renders per request, so a nonce-based policy blocked every inline
+  script and served a blank white page with a green build. `script-src` therefore allows inline
+  scripts and the policy is honest about being weaker than it looks. `scripts/smoke.mjs` asserts the
+  header and the HTML still agree, so that particular outage cannot recur unnoticed.
+- **App Check** is wired up but dormant until `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` is set. See
+  `env.example` for the rollout order — enforcing before tokens are arriving locks everyone out.
+- **Profile pictures** are cropped and resized in the browser and stored as data URLs on the profile
+  document, not in Cloud Storage — which on the free plan is not an option at all, since Firebase now
+  requires a billing account to provision a bucket. It keeps one access-control story instead of two,
+  but it also means every approved player downloads every other player's picture with the league
+  table. They are written at 192px, and the rules cap each one at 200 KB. Nothing is public: an unapproved account cannot read a single profile but its own.
 - **The message board** is readable and writable only by approved players. Messages cannot be
   edited after posting — by anyone, including admins — so a thread cannot be rewritten underneath
   the replies. Authors and admins can delete.
@@ -177,7 +206,9 @@ npm run dev         # http://localhost:3000
 npm run typecheck   # tsc --noEmit
 npm run build       # production build
 npm run seed        # markets, instruments, settings
+npm test            # the scoring functions — no emulator, no network
 npm run test:rules  # firestore.rules against the emulator
+npm run smoke       # check a deployed URL actually renders
 ```
 
 ### The rules tests
