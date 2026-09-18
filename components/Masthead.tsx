@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { BrandMark } from "@/components/BrandMark";
+import { Search } from "@/components/Search";
 import { useChatUnread } from "@/lib/hooks";
 
 /**
@@ -117,6 +118,10 @@ export function Masthead() {
             );
           })}
         </nav>
+
+        {/* Players only, and it hides itself when there is nobody signed
+            in to search for. */}
+        <Search />
 
         {/* Both are always in the markup; CSS shows one. Gating on
             `loading` meant neither appeared until hydration finished. */}
