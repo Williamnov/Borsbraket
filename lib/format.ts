@@ -78,7 +78,9 @@ export function formatDateTime(value: string | null | undefined): string {
 }
 
 /** Player-facing name. Falls back to the local part of the email. */
-export function displayName(profile: { alias?: string | null; email?: string } | null): string {
+export function displayName(
+  profile: { alias?: string | null; email?: string } | null | undefined,
+): string {
   if (!profile) return "Player";
   if (profile.alias && profile.alias.trim()) return profile.alias.trim();
   if (profile.email) return profile.email.split("@")[0];
