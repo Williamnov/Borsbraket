@@ -1,0 +1,47 @@
+name: Refresh lockfile
+
+# package-lock.json drifted out of sync with package.json: dozens of
+# transitive dependencies are missing from it, including every
+# @esbuild/* platform package. Nothing noticed, because Vercel installs
+# with `npm install`, which resolves the gaps silently. `npm ci` does
+# not — it refuses outright, which is the point of it.
+#
+# A lockfile that does not describe what actually gets installed is not
+# doing its job, so this regenerates it rather than loosening CI to match.
+# Run it by hand from the Actions tab when a dependency changes and the
+# lockfile was not updated alongside it.
+
+on: workflow_dispatch
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    name: Regenerate package-lock.json
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Resolves the tree and rewrites the lockfile without installing it.
+      - run: npm install --package-lock-only --no-audit --no-fund
+
+      # Proves the result is actually installable before committing it,
+      # rather than trading one broken lockfile for another.
+      - run: npm ci
+
+      - name: Commit if it changed
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "Lockfile already in sync; nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Regenerate package-lock.json so npm ci resolves"
+          git push
