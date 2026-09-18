@@ -3,21 +3,48 @@ import { NextResponse, type NextRequest } from "next/server";
 /**
  * Content-Security-Policy.
  *
- * This lives in middleware rather than in next.config.mjs because the
- * policy carries a per-request nonce. Next inlines a handful of its own
- * bootstrap scripts into every page; without a nonce the only ways to
- * allow them are 'unsafe-inline', which makes the whole policy
- * decorative, or a hash list that changes with every Next release.
+ * ── Why there is no nonce ──────────────────────────────────────────────
  *
- * Next reads the nonce back out of this header and stamps it onto the
- * script tags it renders, so nothing in the app has to thread it through
- * by hand. Server components that need it can read `x-nonce`.
+ * There was one, and it took the site down. The mechanism only works for
+ * pages Next renders per request: Next reads the nonce back out of the
+ * request's `content-security-policy` header while rendering and stamps
+ * it onto the script tags it emits. Every page here is a client component
+ * with no request-time data, so Next prerenders all of them at build
+ * time — when there is no request and no nonce to read. The HTML went out
+ * with no `nonce=` anywhere on it, while this middleware kept attaching a
+ * freshly generated nonce to each response.
  *
- * The static headers — nosniff, Referrer-Policy and the rest — stay in
- * next.config.mjs, which is the cheaper place for anything constant.
+ * The result was not a partly-broken page. Next's external chunks are
+ * allowed by 'self' and loaded fine; its inline `self.__next_f.push(...)`
+ * scripts — which carry the entire payload React hydrates against — were
+ * blocked. React started up, found nothing to hydrate, and cleared the
+ * server-rendered DOM. A blank white page, and nothing in the server logs,
+ * because as far as the server was concerned it had served a 200.
+ *
+ * So `script-src` carries 'unsafe-inline' instead, and this policy is
+ * honest about being weaker for scripts than it looks. Earning the nonce
+ * back means rendering the pages dynamically (`export const dynamic =
+ * "force-dynamic"` on the root layout), which is a real decision about
+ * caching rather than something to slip in beside a header change — and
+ * not one to make while the site is down.
+ *
+ * ── Why it ships report-only ───────────────────────────────────────────
+ *
+ * A report-only header never blocks anything, so a directive that is
+ * wrong costs a console message instead of the site. The connect-src
+ * origins below were written from memory rather than from a trace of a
+ * real session, and Firestore picks its transport endpoint at runtime —
+ * exactly the kind of thing that fails as a blank page.
+ *
+ * Set CSP_ENFORCE=1 once a full session — sign in, post a message, upload
+ * a photo — produces no reports. Everything constant stays in
+ * next.config.mjs, which is the cheaper place for it.
  */
 
 const isDev = process.env.NODE_ENV !== "production";
+
+/** Enforcing only when explicitly switched on. Report-only is the default. */
+const enforce = process.env.CSP_ENFORCE === "1";
 
 /**
  * Firebase Auth resolves the Google popup through a hidden iframe on the
@@ -27,7 +54,7 @@ const isDev = process.env.NODE_ENV !== "production";
  */
 const AUTH_DOMAIN = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
 
-function policy(nonce: string): string {
+function policy(): string {
   const authOrigin = AUTH_DOMAIN ? `https://${AUTH_DOMAIN}` : "";
 
   const directives: Record<string, string[]> = {
@@ -39,36 +66,38 @@ function policy(nonce: string): string {
 
     // Profile pictures are inline JPEG data URLs on the profile
     // document — see the photoUrl cap in firestore.rules.
-    "img-src": ["'self'", "data:"],
+    "img-src": ["'self'", "data:", "https://*.googleusercontent.com"],
 
-    // The nonce covers Next's bootstrap. apis.google.com is the gapi
-    // loader Firebase Auth pulls in for the sign-in popup.
-    // 'unsafe-eval' is development only: the dev server's hot reload
-    // needs it, and a production build does not.
+    // 'unsafe-inline' covers Next's inline bootstrap and flight data; see
+    // the note at the top of this file for why it is not a nonce.
+    // apis.google.com and gstatic.com are the gapi loader Firebase Auth
+    // pulls in for the sign-in popup. 'unsafe-eval' is development only:
+    // the dev server's hot reload needs it, a production build does not.
     "script-src": [
       "'self'",
-      `'nonce-${nonce}'`,
+      "'unsafe-inline'",
       "https://apis.google.com",
       "https://www.gstatic.com",
       ...(isDev ? ["'unsafe-eval'"] : []),
     ],
 
-    // 'unsafe-inline' is load-bearing and not an oversight: the pages
-    // use React `style={{…}}` attributes throughout, and CSP counts
-    // those as inline styles. Removing it means rewriting every one of
-    // them into a class first. Scripts, which are what actually matter
-    // here, are nonce-gated above.
+    // React `style={{…}}` attributes throughout the pages count as inline
+    // styles, so this one was never going to be tight either.
     "style-src": ["'self'", "'unsafe-inline'"],
 
     // Firestore's web transport, the token service and the identity
     // toolkit all sit under googleapis.com; the socket is the streaming
-    // listener behind onSnapshot.
+    // listener behind onSnapshot. These are the directives the
+    // report-only run is really here to check.
     "connect-src": [
       "'self'",
       "https://*.googleapis.com",
       "wss://*.googleapis.com",
       "https://*.firebaseio.com",
       "wss://*.firebaseio.com",
+      "https://*.firebaseapp.com",
+      "https://apis.google.com",
+      "https://accounts.google.com",
       ...(authOrigin ? [authOrigin] : []),
     ],
 
@@ -86,23 +115,24 @@ function policy(nonce: string): string {
     .map(([name, values]) => `${name} ${values.join(" ")}`)
     .join("; ");
 
-  // Only in production: on http://localhost this directive would upgrade
-  // the dev server's own requests to https and break the page.
-  return isDev ? rendered : `${rendered}; upgrade-insecure-requests`;
+  // Violations go somewhere durable rather than to whichever console
+  // happened to be open. report-uri is the deprecated spelling every
+  // browser still implements; report-to is the replacement Chrome wants.
+  const reporting = "report-uri /api/csp-report";
+
+  // upgrade-insecure-requests only in production: on http://localhost it
+  // would upgrade the dev server's own requests and break the page.
+  return isDev
+    ? `${rendered}; ${reporting}`
+    : `${rendered}; upgrade-insecure-requests; ${reporting}`;
 }
 
-export function middleware(request: NextRequest) {
-  const nonce = btoa(crypto.randomUUID());
-  const header = policy(nonce);
-
-  // Next looks for the nonce on the request headers it re-reads while
-  // rendering, so it has to be set on the way in as well as the way out.
-  const headers = new Headers(request.headers);
-  headers.set("x-nonce", nonce);
-  headers.set("content-security-policy", header);
-
-  const response = NextResponse.next({ request: { headers } });
-  response.headers.set("content-security-policy", header);
+export function middleware(_request: NextRequest) {
+  const response = NextResponse.next();
+  response.headers.set(
+    enforce ? "content-security-policy" : "content-security-policy-report-only",
+    policy(),
+  );
   return response;
 }
 
@@ -114,12 +144,6 @@ export const config = {
      * app icon. Skipping them keeps the middleware off the hot path for
      * static assets.
      */
-    {
-      source: "/((?!_next/static|_next/image|icon.png|favicon.ico).*)",
-      missing: [
-        { type: "header", key: "next-router-prefetch" },
-        { type: "header", key: "purpose", value: "prefetch" },
-      ],
-    },
+    "/((?!_next/static|_next/image|icon.png|favicon.ico).*)",
   ],
 };
