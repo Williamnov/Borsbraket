@@ -27,23 +27,80 @@ export type Profile = {
    * and by admins. firestore.rules refuses a handle containing an @.
    */
   handle: string;
+  /** The display name, chosen by the player. Falls back to the handle. */
   alias: string | null;
-  emoji: string;
-  color: number;
-  motto: string | null;
+  /** A line about yourself. Replaces the old "battle cry". */
+  description: string | null;
+  /**
+   * A small badge in the corner of the avatar rather than the avatar
+   * itself. The picture is the identity now; this is flair on top of it.
+   */
+  icon: string;
   /**
    * A square JPEG data URL, resized in the browser before it is saved.
-   * Null means the emoji is used instead. Stored on the profile document
-   * rather than in Cloud Storage: the images are a few tens of kilobytes,
-   * every reader of the league table already reads this document, and it
-   * keeps the whole access story inside firestore.rules.
+   * Stored on the profile document rather than in Cloud Storage: the
+   * images are a few tens of kilobytes, every reader of the league table
+   * already reads this document, and it keeps the whole access story
+   * inside firestore.rules.
+   *
+   * This is also the app's largest bandwidth cost, and the reason to
+   * move to Cloud Storage once the league outgrows a handful of players.
    */
   photoUrl: string | null;
   status: ProfileStatus;
   isAdmin: boolean;
   createdAt?: Instant;
   approvedAt?: Instant;
+
+  /**
+   * Written by earlier versions and read only so that a profile saved
+   * before the rename still renders. Saving a profile clears them.
+   * `color` is gone entirely: the avatar's tint is derived from the uid,
+   * which is one less thing to store and cannot clash with itself.
+   */
+  motto?: string | null;
+  emoji?: string;
+  color?: number;
 };
+
+/** The badge to show, tolerating documents written before the rename. */
+export function profileIcon(profile: Pick<Profile, "icon" | "emoji"> | null | undefined): string {
+  return profile?.icon || profile?.emoji || "";
+}
+
+/** The description, tolerating documents that still say `motto`. */
+export function profileDescription(
+  profile: Pick<Profile, "description" | "motto"> | null | undefined,
+): string {
+  return (profile?.description ?? profile?.motto ?? "").trim();
+}
+
+/**
+ * The avatar's tint, derived rather than stored.
+ *
+ * Eight tints and a stable hash of the uid: the same player is always
+ * the same colour, nobody has to pick one, and there is no field to keep
+ * in step. Colours repeat above eight players, which is fine — it is a
+ * background wash behind a picture or a pair of initials, not an
+ * identifier.
+ */
+export function profileTint(uid: string): number {
+  let hash = 0;
+  for (let i = 0; i < uid.length; i++) hash = (hash * 31 + uid.charCodeAt(i)) >>> 0;
+  return (hash % 8) + 1;
+}
+
+/** Up to two letters from the display name, for an avatar with no photo. */
+export function profileInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
+/** Matches the ceiling firestore.rules enforces. */
+export const MAX_DESCRIPTION_CHARS = 140;
+export const MAX_ALIAS_CHARS = 24;
 
 /** The hard ceiling the rules also enforce, in characters of data URL. */
 export const MAX_PHOTO_CHARS = 200_000;

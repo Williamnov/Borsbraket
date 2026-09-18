@@ -102,6 +102,21 @@ service cloud.firestore {
           && !data.handle.matches('.*@.*');
     }
 
+    // The description and display name are free text every approved
+    // player can read, so they get a ceiling here rather than only in the
+    // form that writes them. Absent is fine; null is fine.
+    function textOk(data, field, limit) {
+      return !(field in data.keys())
+          || data[field] == null
+          || (data[field] is string && data[field].size() <= limit);
+    }
+
+    function profileTextOk(data) {
+      return textOk(data, 'description', 140)
+          && textOk(data, 'alias', 24)
+          && textOk(data, 'icon', 16);
+    }
+
     match /profiles/{uid} {
       // You can always read your own row, including while pending, so the
       // waiting-room page can explain itself. Approved players see the
@@ -115,6 +130,7 @@ service cloud.firestore {
                     && request.resource.data.status == 'pending'
                     && request.resource.data.isAdmin == false
                     && handleOk(request.resource.data)
+                    && profileTextOk(request.resource.data)
                     && photoOk(request.resource.data);
 
       // Cosmetic self-edits only. Approval, admin rights and the handle
@@ -125,6 +141,7 @@ service cloud.firestore {
                     && request.resource.data.isAdmin == resource.data.isAdmin
                     && request.resource.data.uid == resource.data.uid
                     && request.resource.data.handle == resource.data.handle
+                    && profileTextOk(request.resource.data)
                     && photoOk(request.resource.data);
 
       // Admins approve, reject and promote.

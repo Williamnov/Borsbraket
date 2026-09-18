@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { deleteField, doc, updateDoc } from "firebase/firestore";
 import { useAuth } from "@/components/AuthProvider";
 import { Avatar, Empty, PageHead, Panel, RequirePlayer, Reveal, Value } from "@/components/ui";
 import { firestore } from "@/lib/firebase/client";
@@ -9,53 +9,25 @@ import { useRoundBundles } from "@/lib/hooks";
 import { useLeagueBase } from "@/components/LeagueProvider";
 import { buildSeason, roundPhase, scoreRound } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
-import { MAX_PHOTO_CHARS, type Round, type ScoredEntry } from "@/lib/types";
+import { PhotoCropper } from "@/components/PhotoCropper";
+import {
+  MAX_ALIAS_CHARS,
+  MAX_DESCRIPTION_CHARS,
+  profileDescription,
+  profileIcon,
+  type Round,
+  type ScoredEntry,
+} from "@/lib/types";
 
-const EMOJI = [
+const ICONS = [
   "📈", "📉", "🦊", "🐻", "🐂", "🚀", "🧊", "🎲", "🦅", "🐺",
   "🦉", "🐙", "🦁", "🐝", "🌪", "⚡️", "🔥", "🎯", "🛡", "⚓️",
   "🧭", "🪓", "🏔", "🌲", "🍀", "☕️", "🧀", "🎣", "⛷", "🏒",
   "👑", "💀", "🤖", "👽", "🕶", "🎩", "🧶", "🪙", "🏆", "🧠",
 ];
 
-const COLORS = [1, 2, 3, 4, 5, 6, 7, 8];
-
-/** The avatar is never shown larger than 88px, so 256 covers retina. */
-const PHOTO_SIZE = 256;
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic"];
 
-/**
- * Read a file the player chose, crop it square from the centre, scale it
- * to PHOTO_SIZE and hand back a JPEG data URL.
- *
- * Doing this in the browser is what makes storing the image on the
- * profile document reasonable: a 4 MB phone photo comes back at roughly
- * 20 KB, and nothing but the resized copy ever leaves the device.
- */
-async function toSquareDataUrl(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  try {
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sx = (bitmap.width - side) / 2;
-    const sy = (bitmap.height - side) / 2;
-
-    const canvas = document.createElement("canvas");
-    canvas.width = PHOTO_SIZE;
-    canvas.height = PHOTO_SIZE;
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("This browser would not give us a canvas to resize with.");
-    context.drawImage(bitmap, sx, sy, side, side, 0, 0, PHOTO_SIZE, PHOTO_SIZE);
-
-    // Step the quality down until it fits what the rules will accept.
-    for (const quality of [0.82, 0.7, 0.6, 0.5, 0.4]) {
-      const url = canvas.toDataURL("image/jpeg", quality);
-      if (url.length <= MAX_PHOTO_CHARS) return url;
-    }
-    throw new Error("That image would not compress small enough. Try a simpler picture.");
-  } finally {
-    bitmap.close();
-  }
-}
 
 export default function ProfilePage() {
   return (
@@ -70,9 +42,10 @@ function ProfileEditor() {
   const { profiles, rounds, loading } = useLeagueBase();
 
   const [alias, setAlias] = useState(profile?.alias ?? "");
-  const [motto, setMotto] = useState(profile?.motto ?? "");
-  const [emoji, setEmoji] = useState(profile?.emoji ?? "📈");
-  const [color, setColor] = useState(profile?.color ?? 1);
+  const [description, setDescription] = useState(profileDescription(profile));
+  const [icon, setIcon] = useState(profileIcon(profile) || "📈");
+  // The file waiting to be cropped, if any.
+  const [pending, setPending] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.photoUrl ?? null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
@@ -122,33 +95,29 @@ function ProfileEditor() {
   }, [pastRounds, scored, profile]);
 
   const preview = useMemo(
-    () => (profile ? { ...profile, alias, motto, emoji, color, photoUrl } : null),
-    [profile, alias, motto, emoji, color, photoUrl],
+    () => (profile ? { ...profile, alias, description, icon, photoUrl } : null),
+    [profile, alias, description, icon, photoUrl],
   );
 
-  async function pickPhoto(file: File | undefined) {
+  /**
+   * Choosing a file no longer saves a crop; it opens one. The centre of a
+   * photograph is rarely the part of it you want in a circle.
+   */
+  function pickPhoto(file: File | undefined) {
     if (!file) return;
     setMessage(null);
-
     if (file.type && !ACCEPTED.includes(file.type)) {
       setMessage({ kind: "bad", text: "That is not an image file." });
+      if (fileInput.current) fileInput.current.value = "";
       return;
     }
+    setPending(file);
+  }
 
-    setBusy(true);
-    try {
-      setPhotoUrl(await toSquareDataUrl(file));
-      setMessage({ kind: "good", text: "Picture ready — save to keep it." });
-    } catch (error) {
-      setMessage({
-        kind: "bad",
-        text: error instanceof Error ? error.message : "Could not read that image.",
-      });
-    } finally {
-      setBusy(false);
-      // Lets the same file be chosen again after a failure.
-      if (fileInput.current) fileInput.current.value = "";
-    }
+  function closeCropper() {
+    setPending(null);
+    // Lets the same file be chosen again after a cancel or a failure.
+    if (fileInput.current) fileInput.current.value = "";
   }
 
   async function save() {
@@ -157,11 +126,17 @@ function ProfileEditor() {
     setMessage(null);
     try {
       await updateDoc(doc(firestore(), "profiles", profile.uid), {
-        alias: alias.trim() ? alias.trim().slice(0, 24) : null,
-        motto: motto.trim() ? motto.trim().slice(0, 80) : null,
-        emoji,
-        color,
+        alias: alias.trim() ? alias.trim().slice(0, MAX_ALIAS_CHARS) : null,
+        description: description.trim()
+          ? description.trim().slice(0, MAX_DESCRIPTION_CHARS)
+          : null,
+        icon,
         photoUrl,
+        // Written by earlier versions. Removed on save so a profile does
+        // not carry two names for the same thing forever.
+        motto: deleteField(),
+        emoji: deleteField(),
+        color: deleteField(),
       });
       setMessage({ kind: "good", text: "Profile saved." });
     } catch (error) {
@@ -193,7 +168,7 @@ function ProfileEditor() {
                     {displayName(preview)}
                   </div>
                   <div className="secondary" style={{ fontSize: 13 }}>
-                    {motto.trim() || "No battle cry yet"}
+                    {description.trim() || "No description yet"}
                   </div>
 
                   <div className="row" style={{ gap: 8, marginTop: 12 }}>
@@ -227,10 +202,24 @@ function ProfileEditor() {
                 </div>
               </div>
 
-              <p className="hint" style={{ marginTop: 14 }}>
-                The picture is cropped square, scaled down in your browser and replaces the emoji
-                everywhere you appear. Everyone in the league can see it.
-              </p>
+              {pending ? (
+                <div style={{ marginTop: 16 }}>
+                  <PhotoCropper
+                    file={pending}
+                    onCancel={closeCropper}
+                    onDone={(url) => {
+                      setPhotoUrl(url);
+                      closeCropper();
+                      setMessage({ kind: "good", text: "Picture ready — save to keep it." });
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="hint" style={{ marginTop: 14 }}>
+                  The picture is cropped and scaled down in your browser, and nothing but the
+                  small copy ever leaves your device. Everyone in the league can see it.
+                </p>
+              )}
             </div>
           </div>
 
@@ -256,76 +245,73 @@ function ProfileEditor() {
               <input
                 id="alias"
                 value={alias}
-                maxLength={24}
+                maxLength={MAX_ALIAS_CHARS}
                 onChange={(e) => setAlias(e.target.value)}
                 placeholder={profile.handle}
               />
             </label>
 
-            <label className="field" htmlFor="motto">
-              <span>Battle cry</span>
-              <input
-                id="motto"
-                value={motto}
-                maxLength={80}
-                onChange={(e) => setMotto(e.target.value)}
+            <label className="field" htmlFor="description">
+              <span>Description</span>
+              <textarea
+                id="description"
+                rows={2}
+                value={description}
+                maxLength={MAX_DESCRIPTION_CHARS}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder="Buys tops, sells bottoms"
               />
+              <span className="hint">
+                {MAX_DESCRIPTION_CHARS - description.length} characters left
+              </span>
             </label>
 
             <div>
               <span className="label" style={{ display: "block", marginBottom: 8 }}>
-                Icon{photoUrl ? " — hidden while you have a picture" : ""}
+                Status badge
               </span>
+              {/* Not the avatar any more — a small mark in the corner of
+                  it, so it sits alongside a photo rather than instead of
+                  one. Choosing none leaves the corner clean. */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))",
                   gap: 6,
-                  opacity: photoUrl ? 0.55 : 1,
                 }}
               >
-                {EMOJI.map((option) => (
+                <button
+                  type="button"
+                  aria-pressed={icon === ""}
+                  aria-label="No badge"
+                  onClick={() => setIcon("")}
+                  style={{
+                    height: 38,
+                    padding: 0,
+                    fontSize: 12,
+                    color: "var(--ink-3)",
+                    borderColor: icon === "" ? "var(--accent)" : "var(--line-strong)",
+                    background: icon === "" ? "var(--accent-soft)" : "var(--surface)",
+                  }}
+                >
+                  None
+                </button>
+                {ICONS.map((option) => (
                   <button
                     key={option}
                     type="button"
-                    aria-pressed={option === emoji}
-                    onClick={() => setEmoji(option)}
+                    aria-pressed={option === icon}
+                    onClick={() => setIcon(option)}
                     style={{
                       height: 38,
                       padding: 0,
                       fontSize: 18,
-                      borderColor: option === emoji ? "var(--accent)" : "var(--line-strong)",
-                      background: option === emoji ? "var(--accent-soft)" : "var(--surface)",
+                      borderColor: option === icon ? "var(--accent)" : "var(--line-strong)",
+                      background: option === icon ? "var(--accent-soft)" : "var(--surface)",
                     }}
                   >
                     {option}
                   </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <span className="label" style={{ display: "block", marginBottom: 8 }}>
-                Colour
-              </span>
-              <div className="row" style={{ gap: 8 }}>
-                {COLORS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-label={`Colour ${option}`}
-                    aria-pressed={option === color}
-                    className={`avatar c${option}`}
-                    onClick={() => setColor(option)}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      padding: 0,
-                      borderRadius: "50%",
-                      border: option === color ? "2px solid var(--ink)" : "1px solid var(--line-strong)",
-                    }}
-                  />
                 ))}
               </div>
             </div>

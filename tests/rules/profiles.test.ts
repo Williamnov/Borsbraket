@@ -91,7 +91,7 @@ describe("profiles", () => {
   it("let a player edit their own cosmetics", async () => {
     const anna = as(env, "anna");
     await assertSucceeds(
-      updateDoc(doc(anna, "profiles", "anna"), { alias: "Anna", motto: "Buys tops", emoji: "🦊" }),
+      updateDoc(doc(anna, "profiles", "anna"), { alias: "Anna", description: "Buys tops", icon: "🦊" }),
     );
   });
 
@@ -116,9 +116,8 @@ describe("profiles", () => {
         uid: "dagny",
         handle: "dagny@example.com",
         alias: null,
-        emoji: "📈",
-        color: 1,
-        motto: null,
+        description: null,
+        icon: "📈",
         photoUrl: null,
         status: "pending",
         isAdmin: false,
@@ -133,9 +132,8 @@ describe("profiles", () => {
         uid: "dagny",
         handle: "dagny",
         alias: null,
-        emoji: "📈",
-        color: 1,
-        motto: null,
+        description: null,
+        icon: "📈",
         photoUrl: null,
         status: "pending",
         isAdmin: false,
@@ -150,9 +148,8 @@ describe("profiles", () => {
         uid: "dagny",
         handle: "dagny",
         alias: null,
-        emoji: "📈",
-        color: 1,
-        motto: null,
+        description: null,
+        icon: "📈",
         photoUrl: null,
         status: "approved",
         isAdmin: false,

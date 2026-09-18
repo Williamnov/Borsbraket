@@ -5,8 +5,27 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useAuth } from "@/components/AuthProvider";
 import { direction, displayName, formatPercent } from "@/lib/format";
 import type { SortDirection } from "@/lib/scoring";
-import type { Profile } from "@/lib/types";
+import {
+  profileDescription,
+  profileIcon,
+  profileInitials,
+  profileTint,
+  type Profile,
+} from "@/lib/types";
 
+/**
+ * A player's picture, with their badge in the corner.
+ *
+ * The circle is the photo when there is one and their initials when
+ * there is not — an identity either way, rather than an emoji standing
+ * in for a face. The chosen icon rides on the top-right corner as a
+ * badge, which is why the clipped circle and the badge are separate
+ * elements: `.avatar` hides its overflow so a photo stays round, and a
+ * badge inside it would be sliced in half.
+ *
+ * The tint behind the initials is derived from the uid, so it is stable
+ * per player and nothing has to store it.
+ */
 export function Avatar({
   profile,
   large,
@@ -16,21 +35,26 @@ export function Avatar({
   large?: boolean;
   size?: "lg" | "xl";
 }) {
-  const color = profile?.color ?? 1;
   const scale = size ?? (large ? "lg" : null);
   const photo = profile?.photoUrl;
+  const icon = profileIcon(profile);
+  const tint = profile?.uid ? profileTint(profile.uid) : 1;
+  const initials = profileInitials(displayName(profile ?? null));
 
   return (
-    <span className={`avatar c${color}${scale ? ` ${scale}` : ""}`} aria-hidden="true">
-      {photo ? (
-        // A data URL from the player's own upload. next/image would need a
-        // loader and gains nothing here: the bytes are already inline and
-        // already resized.
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photo} alt="" />
-      ) : (
-        (profile?.emoji ?? "📈")
-      )}
+    <span className={`avatar-wrap${scale ? ` ${scale}` : ""}`} aria-hidden="true">
+      <span className={`avatar c${tint}${scale ? ` ${scale}` : ""}`}>
+        {photo ? (
+          // A data URL from the player's own upload. next/image would need
+          // a loader and gains nothing here: the bytes are already inline
+          // and already resized.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo} alt="" />
+        ) : (
+          <span className="avatar-initials">{initials}</span>
+        )}
+      </span>
+      {icon ? <span className="avatar-badge">{icon}</span> : null}
     </span>
   );
 }
@@ -52,7 +76,9 @@ export function PlayerCell({
           {displayName(profile)}
           {you ? " (you)" : ""}
         </span>
-        {withMotto && profile?.motto ? <span className="motto">{profile.motto}</span> : null}
+        {withMotto && profileDescription(profile) ? (
+          <span className="motto">{profileDescription(profile)}</span>
+        ) : null}
       </span>
     </div>
   );
