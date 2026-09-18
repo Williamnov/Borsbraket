@@ -117,6 +117,22 @@ service cloud.firestore {
           && textOk(data, 'icon', 16);
     }
 
+    // The handle cannot be changed — but it can be set, once, on a
+    // profile that predates it.
+    //
+    // Before the address moved to contacts/{uid}, the public profile
+    // carried the address itself and had no handle at all. Comparing
+    // against a field that is not there fails the whole rule, so those
+    // players could not save their own profile: not a cosmetic problem,
+    // an account frozen out of its own settings page. Allowing the field
+    // to be filled in when it is absent unfreezes them, and it is pinned
+    // from then on because the key now exists.
+    function handlePinned() {
+      return ('handle' in resource.data.keys())
+          ? request.resource.data.handle == resource.data.handle
+          : handleOk(request.resource.data);
+    }
+
     match /profiles/{uid} {
       // You can always read your own row, including while pending, so the
       // waiting-room page can explain itself. Approved players see the
@@ -140,7 +156,7 @@ service cloud.firestore {
                     && request.resource.data.status == resource.data.status
                     && request.resource.data.isAdmin == resource.data.isAdmin
                     && request.resource.data.uid == resource.data.uid
-                    && request.resource.data.handle == resource.data.handle
+                    && handlePinned()
                     && profileTextOk(request.resource.data)
                     && photoOk(request.resource.data);
 

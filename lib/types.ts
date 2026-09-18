@@ -61,6 +61,14 @@ export type Profile = {
   motto?: string | null;
   emoji?: string;
   color?: number;
+
+  /**
+   * Older still: before the address moved to contacts/{uid}, the public
+   * profile carried it directly and had no `handle` at all. Those rows
+   * are read here only so they can show a name and be given a handle;
+   * nothing writes this field any more.
+   */
+  email?: string;
 };
 
 /** The badge to show, tolerating documents written before the rename. */

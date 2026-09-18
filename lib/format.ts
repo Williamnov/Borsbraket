@@ -92,15 +92,27 @@ export function timeAgo(date: Date | null, now = new Date()): string {
 }
 
 /**
- * Player-facing name. Falls back to the handle — the part of the sign-in
- * address before the @ — which is what the public profile carries. The
- * address itself is not on that document and is not readable here.
+ * Player-facing name.
+ *
+ * Falls back to the handle — the part of the sign-in address before the
+ * @ — which is what the public profile carries. The address itself is
+ * not on that document and is not readable here.
+ *
+ * The third fallback is for profiles written before the address moved to
+ * contacts/{uid}. Those have no handle at all, and without this every
+ * one of them rendered as the literal word "Player", which made the
+ * league table a list of identical strangers. Only the local part is
+ * used, so this never puts an address on screen.
  */
 export function displayName(
-  profile: { alias?: string | null; handle?: string } | null | undefined,
+  profile: { alias?: string | null; handle?: string; email?: string } | null | undefined,
 ): string {
   if (!profile) return "Player";
   if (profile.alias && profile.alias.trim()) return profile.alias.trim();
   if (profile.handle && profile.handle.trim()) return profile.handle.trim();
+
+  const legacy = (profile.email ?? "").split("@")[0].trim();
+  if (legacy) return legacy;
+
   return "Player";
 }

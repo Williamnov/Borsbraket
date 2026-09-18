@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 import { assertFails, assertSucceeds, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
 import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
-import { anonymous, as, makeTestEnv, seed } from "./helpers";
+import { anonymous, as, makeTestEnv, seed, withoutRules } from "./helpers";
 
 /**
  * Profiles, and the addresses that are deliberately not on them.
@@ -92,6 +92,50 @@ describe("profiles", () => {
     const anna = as(env, "anna");
     await assertSucceeds(
       updateDoc(doc(anna, "profiles", "anna"), { alias: "Anna", description: "Buys tops", icon: "🦊" }),
+    );
+  });
+
+  /**
+   * Profiles written before the address moved to contacts/{uid} have no
+   * handle. Comparing against a field that is not there fails the whole
+   * rule, which locked those players out of their own settings page —
+   * so the field may be filled in once, and is pinned after that.
+   */
+  it("let a profile with no handle gain one, then pin it", async () => {
+    await withoutRules(env, async (db) => {
+      await setDoc(doc(db, "profiles", "legacy"), {
+        uid: "legacy",
+        alias: null,
+        description: null,
+        icon: "📈",
+        photoUrl: null,
+        status: "approved",
+        isAdmin: false,
+      });
+    });
+
+    const legacy = as(env, "legacy");
+    await assertSucceeds(updateDoc(doc(legacy, "profiles", "legacy"), { handle: "legacy" }));
+    // And now that it exists, it cannot be moved.
+    await assertFails(updateDoc(doc(legacy, "profiles", "legacy"), { handle: "someone-else" }));
+  });
+
+  it("refuse a handle that is an address, even on a profile without one", async () => {
+    await withoutRules(env, async (db) => {
+      await setDoc(doc(db, "profiles", "legacy2"), {
+        uid: "legacy2",
+        alias: null,
+        description: null,
+        icon: "📈",
+        photoUrl: null,
+        status: "approved",
+        isAdmin: false,
+      });
+    });
+
+    const legacy = as(env, "legacy2");
+    await assertFails(
+      updateDoc(doc(legacy, "profiles", "legacy2"), { handle: "legacy2@example.com" }),
     );
   });
 

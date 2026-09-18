@@ -38,17 +38,27 @@ const PAUSE_MS = 65_000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function required(name, value) {
-  if (!value) {
-    console.error(`Missing ${name}.`);
-    process.exit(1);
-  }
-  return value;
-}
+/**
+ * Not yet configured is a state, not a failure.
+ *
+ * The workflow runs daily whether or not the secrets exist. Exiting
+ * green with an explanation means nobody is emailed about a setup step
+ * they have not taken yet — while a run that is configured and then
+ * breaks still goes red, which is the whole point of running it here.
+ */
+const missing = [
+  ["SITE_URL", SITE],
+  ["CRON_SECRET", SECRET],
+  ["TWELVEDATA_API_KEY", KEY],
+]
+  .filter(([, value]) => !value)
+  .map(([name]) => name);
 
-required("SITE_URL", SITE);
-required("CRON_SECRET", SECRET);
-required("TWELVEDATA_API_KEY", KEY);
+if (missing.length > 0) {
+  console.log(`Not configured yet — set ${missing.join(", ")} in the repository secrets.`);
+  console.log("Prices can still be entered by hand from the admin panel until then.");
+  process.exit(0);
+}
 
 const auth = { authorization: `Bearer ${SECRET}` };
 

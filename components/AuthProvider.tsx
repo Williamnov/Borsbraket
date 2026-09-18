@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, signOut as fbSignOut, type User } from "firebase/auth";
-import { doc, onSnapshot, serverTimestamp, writeBatch } from "firebase/firestore";
+import { doc, onSnapshot, serverTimestamp, updateDoc, writeBatch } from "firebase/firestore";
 import { firebaseAuth, firestore, isFirebaseConfigured } from "@/lib/firebase/client";
 import {
   applyHintAttributes,
@@ -92,8 +92,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ref,
       (snap) => {
         if (snap.exists()) {
-          setProfile({ ...(snap.data() as Profile), uid: snap.id });
+          const data = { ...(snap.data() as Profile), uid: snap.id };
+          setProfile(data);
           setProfileReady(true);
+
+          // Profiles written before the address moved to contacts/{uid}
+          // have no handle, which is what made every one of them render
+          // as the word "Player". Fill it in once, from the address on
+          // the token rather than from the document, so the value is the
+          // verified one. The rules allow this exactly once; after that
+          // the field exists and is pinned.
+          if (!data.handle && user.email) {
+            void updateDoc(ref, { handle: handleFrom(user.email) }).catch(() => {
+              /* An admin can set it by hand if the rules refuse. */
+            });
+          }
           return;
         }
         // First sign-in: register as a pending player. The rules pin

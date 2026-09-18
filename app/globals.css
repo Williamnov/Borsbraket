@@ -275,6 +275,10 @@ html[data-search-open="1"] .nav {
   max-width: 0;
   opacity: 0;
   pointer-events: none;
+  /* Without this the links keep wrapping as the width goes to zero, so
+     the nav ends up seven rows tall and shoves the masthead open —
+     clipped sideways, but nothing was clipping its height. */
+  flex-wrap: nowrap;
 }
 
 /* Active pages get a rule under the label rather than a filled chip:
@@ -985,6 +989,176 @@ fieldset { border: 0; margin: 0; padding: 0; }
 .week-bar.down { background: var(--down); }
 
 /* ── Instructions typography ───────────────────────────────────────── */
+
+/* ── The rules page ────────────────────────────────────────────────────
+   Was a column of prose. Nobody reads a paragraph to find out what
+   second place pays, so the parts that are lists are lists, the points
+   are a table, and the checkpoints are a timeline. */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s7);
+  padding-top: var(--s6);
+}
+
+.guide-hero { max-width: 60ch; }
+.guide-hero h1 { font-size: 36px; letter-spacing: -0.03em; }
+.guide-hero p {
+  margin-top: var(--s3);
+  font-size: 17px;
+  color: var(--ink-2);
+}
+
+.guide-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s5);
+}
+.guide-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.guide-chip strong {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.guide-section { display: flex; flex-direction: column; gap: var(--s4); }
+.guide-section > h2 {
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Four numbered steps for the shape of a month. */
+.guide-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+.guide-steps li { display: flex; gap: var(--s3); align-items: flex-start; }
+.guide-steps strong { display: block; margin-bottom: 2px; }
+.guide-steps .secondary { display: block; font-size: 13.5px; }
+
+.guide-step-n {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.guide-cards {
+  display: grid;
+  gap: var(--s4);
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+}
+.guide-card {
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.guide-card:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-2px);
+}
+.guide-card h3 { margin-bottom: 6px; }
+.guide-card p { color: var(--ink-2); font-size: 14px; }
+
+/* The checkpoints, as a line you can follow. This is the part that
+   changed most recently and the easiest thing to misread from a
+   paragraph. */
+.guide-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  position: relative;
+}
+.guide-timeline li {
+  position: relative;
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+.guide-timeline strong { display: block; font-size: 14px; }
+.guide-timeline .secondary { font-size: 13px; }
+
+.guide-dot {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+.guide-timeline li:first-child .guide-dot { background: var(--accent); }
+
+.guide-split {
+  display: grid;
+  gap: var(--s5);
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 760px) {
+  .guide-split { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
+}
+
+.guide-points {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.guide-points th,
+.guide-points td {
+  padding: 9px var(--s3);
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  text-align: left;
+}
+.guide-points th { background: var(--surface-sunk); font-size: 12px; }
+.guide-points tr:last-child td { border-bottom: 0; }
+.guide-points .right { text-align: right; }
+.guide-points .medal-1 td:first-child { color: var(--gold); font-weight: 600; }
+.guide-points .medal-2 td:first-child { color: var(--silver); font-weight: 600; }
+.guide-points .medal-3 td:first-child { color: var(--bronze); font-weight: 600; }
+
+.guide-end {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-card { transition: border-color 0.18s ease; }
+  .guide-card:hover { transform: none; }
+}
 
 .prose { max-width: 62ch; }
 .prose h2 { margin-top: var(--s6); margin-bottom: 10px; }
