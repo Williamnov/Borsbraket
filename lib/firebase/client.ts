@@ -2,6 +2,7 @@
 
 import { getApp, getApps, initializeApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
+import { ReCaptchaV3Provider, initializeAppCheck } from "firebase/app-check";
 import {
   getFirestore,
   initializeFirestore,
@@ -32,6 +33,53 @@ export function isFirebaseConfigured(): boolean {
   return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.authDomain);
 }
 
+/**
+ * App Check, when a site key has been configured.
+ *
+ * The web config above is public by design, which means anyone can point
+ * their own script at this project and start making requests as a
+ * signed-in account they control. firestore.rules still decides what
+ * such a request may read or write — that is the real defence, and it
+ * does not change here — but App Check adds the question "did this come
+ * from the site at all", which the rules cannot ask.
+ *
+ * It is off until NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY exists, so the
+ * app runs unchanged without it. Switching it on is two steps and they
+ * are deliberately separate: setting the key here makes the browser
+ * start sending tokens, and turning on *enforcement* in the Firebase
+ * console is what starts refusing requests without one. Do them in that
+ * order, and watch the console's App Check metrics in between — turning
+ * enforcement on first locks every real player out.
+ */
+let appCheckStarted = false;
+
+function startAppCheck(instance: ReturnType<typeof initializeApp>) {
+  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
+  if (appCheckStarted || !siteKey || typeof window === "undefined") return;
+  appCheckStarted = true;
+
+  try {
+    // A debug token lets a developer machine, which has no reCAPTCHA
+    // standing, register itself in the console and be allowed through.
+    // Never set in production: it is an explicit bypass.
+    const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+    if (debugToken && process.env.NODE_ENV !== "production") {
+      (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+        debugToken;
+    }
+
+    initializeAppCheck(instance, {
+      provider: new ReCaptchaV3Provider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch {
+    // A bad key, a blocked reCAPTCHA script, or a second initialisation.
+    // With enforcement off this costs nothing; with it on the request
+    // fails anyway, and failing here would take the whole page down
+    // instead of one request.
+  }
+}
+
 function app() {
   if (!isFirebaseConfigured()) {
     throw new Error(
@@ -39,7 +87,9 @@ function app() {
         "NEXT_PUBLIC_FIREBASE_* values from your Firebase project settings.",
     );
   }
-  return getApps().length ? getApp() : initializeApp(firebaseConfig);
+  const instance = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  startAppCheck(instance);
+  return instance;
 }
 
 export function firebaseAuth(): Auth {

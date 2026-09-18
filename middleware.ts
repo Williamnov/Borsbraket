@@ -78,6 +78,11 @@ function policy(): string {
       "'unsafe-inline'",
       "https://apis.google.com",
       "https://www.gstatic.com",
+      // App Check's reCAPTCHA, when it is switched on. Listed
+      // unconditionally: the policy is one string for every response,
+      // and naming a host that is never asked for costs nothing.
+      "https://www.google.com",
+      "https://www.recaptcha.net",
       ...(isDev ? ["'unsafe-eval'"] : []),
     ],
 
@@ -98,10 +103,18 @@ function policy(): string {
       "https://*.firebaseapp.com",
       "https://apis.google.com",
       "https://accounts.google.com",
+      "https://content-firebaseappcheck.googleapis.com",
       ...(authOrigin ? [authOrigin] : []),
     ],
 
-    "frame-src": ["'self'", "https://accounts.google.com", ...(authOrigin ? [authOrigin] : [])],
+    // reCAPTCHA renders in an iframe even in its invisible v3 form.
+    "frame-src": [
+      "'self'",
+      "https://accounts.google.com",
+      "https://www.google.com",
+      "https://www.recaptcha.net",
+      ...(authOrigin ? [authOrigin] : []),
+    ],
 
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
