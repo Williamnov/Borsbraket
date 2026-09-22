@@ -63,6 +63,22 @@ looked like success:
    metrics until tokens are arriving, *then* enable enforcement. That order matters — enforcing
    first locks every player out.
 
+## Picking this up again
+
+Everything is committed and pushed, CI and the post-deploy check are green, and the site is live.
+Two loose ends, neither of them urgent:
+
+- **Bufab and ShaMaran are in Firestore but not in the seed.** They were added by hand before the
+  Stockholm lists were generated, and the generated lists do not contain them — ShaMaran because the
+  First North constituents do not list it (it trades as a depository receipt), Bufab because the
+  name did not match. They work and are pickable; they would just not come back from a fresh seed
+  somewhere else. Either add them to `INSTRUMENTS` in `lib/universe.ts`, or leave them.
+- **55 names of ~670 were left unmatched or ambiguous** when the Stockholm lists were resolved. Run
+  `node scripts/resolve-tickers.mjs` to see them. Most are renames the ticker source spells
+  differently — "Know IT" against "Knowit", "Mekonomen" against "MEKO" — and the ambiguous ones are
+  real share-class choices (SBB B or SBB D). Each needs a person to say which, which is why none of
+  them were guessed.
+
 ## The price feed does not work from GitHub Actions
 
 Yahoo refuses GitHub's address ranges outright. Two price runs on two different runners both came
