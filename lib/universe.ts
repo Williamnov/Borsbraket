@@ -126,8 +126,27 @@ export const INSTRUMENTS: InstrumentSeed[] = [
    * treat the segment as a label to correct from the admin panel rather
    * than a fact. Moving one is a dropdown; nothing downstream breaks.
    */
+  ...list("SE_MID", "SEK", [
+    ["BUFAB", "Bufab"], ["STORY B", "Storytel B"], ["VBG B", "VBG Group B"],
+  ]),
+
   ...list("SE_SMALL", "SEK", [
-    ["CANTA", "Cantargia"], ["CARA", "Carasent"], ["PIERCE", "Pierce Group"],
+    ["CANTA", "Cantargia"], ["CARA", "Carasent"], ["CTEK", "CTEK"],
+    ["PIERCE", "Pierce Group"],
+  ]),
+
+  /*
+   * First North, also previously empty.
+   *
+   * ShaMaran trades in Stockholm as a Swedish depository receipt rather
+   * than an ordinary share, which is why the symbol carries "SDB" — and
+   * why it is worth noting that the existing convention already handles
+   * it. A space becomes a hyphen on the way to the feed, exactly as it
+   * does for the B-shares, so "SNM SDB" reaches Yahoo as "SNM-SDB.ST"
+   * with nothing special added. The plain ticker finds nothing at all.
+   */
+  ...list("SE_FN", "SEK", [
+    ["SNM SDB", "ShaMaran Petroleum SDB"],
   ]),
 
   ...list("FI_LARGE", "EUR", [
