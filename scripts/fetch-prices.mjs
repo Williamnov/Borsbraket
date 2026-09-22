@@ -133,6 +133,25 @@ function yahooSymbol(symbol, marketCode) {
 }
 
 /**
+ * Indices, which are named nothing like shares.
+ *
+ * Yahoo spells an index with a caret and no exchange suffix — ^OMXS30,
+ * ^GSPC — so a benchmark cannot go through yahooSymbol() above. This is
+ * not a cosmetic difference. "SPX" with no suffix resolves to a listed
+ * US *company*, quoted in the same dollars the index is, so the currency
+ * guard would wave it through and a month would be scored against the
+ * wrong benchmark with nothing anywhere saying so.
+ *
+ * A benchmark that is not named here is therefore reported unpriced
+ * rather than guessed at, and the admin grid takes it by hand. Adding
+ * one is a line here beside the entry in lib/universe.ts.
+ */
+const INDEX_SYMBOL = {
+  OMXS30: "^OMXS30",
+  SPX: "^GSPC",
+};
+
+/**
  * London quotes in pence.
  *
  * Yahoo reports GBp on LSE lines where the universe says GBP. The
@@ -358,7 +377,9 @@ async function main() {
       if (!unique.has(request.instrumentId)) {
         unique.set(request.instrumentId, {
           ...request,
-          vendor: yahooSymbol(request.symbol, request.marketCode),
+          vendor: request.isBenchmark
+            ? (INDEX_SYMBOL[String(request.symbol).trim().toUpperCase()] ?? null)
+            : yahooSymbol(request.symbol, request.marketCode),
         });
       }
     }
@@ -372,17 +393,21 @@ async function main() {
   const quotes = [];
   const missing = [];
 
-  // A market nobody has taught the fetcher about. Guessing a suffix
-  // would find a real instrument on the wrong exchange, so these go
-  // straight to the admin grid without a lookup.
+  // Something the fetcher has not been taught to name: a market with no
+  // suffix, or an index missing from INDEX_SYMBOL. Guessing would find a
+  // real instrument that is not the one meant, so these go straight to
+  // the admin grid without a lookup.
   const named = [];
   for (const row of unique.values()) {
     if (row.vendor) {
       named.push(row);
-    } else {
-      missing.push(`${row.symbol} (${row.marketCode}: no exchange suffix)`);
-      console.log(`  ${row.symbol.padEnd(14)} — no Yahoo suffix for ${row.marketCode}`);
+      continue;
     }
+    const why = row.isBenchmark
+      ? "index not in INDEX_SYMBOL"
+      : `no exchange suffix for ${row.marketCode}`;
+    missing.push(`${row.symbol} (${why})`);
+    console.log(`  ${String(row.symbol).padEnd(14)} — ${why}`);
   }
 
   const batches = [];

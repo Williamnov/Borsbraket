@@ -125,7 +125,7 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
 
     for (const id of wanted) {
       const instrument = instruments.get(id) as
-        | { symbol?: string; marketCode?: string; currency?: string }
+        | { symbol?: string; marketCode?: string; currency?: string; isBenchmark?: boolean }
         | undefined;
       if (!instrument?.symbol) continue;
 
@@ -149,6 +149,9 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
         // Checked against what the feed reports, so a symbol that
         // resolves on the wrong exchange is dropped rather than scored.
         currency: instrument.currency ?? "",
+        // An index is named differently from a share by every feed, and
+        // the fetcher cannot tell from the ticker alone.
+        isBenchmark: instrument.isBenchmark === true,
       });
     }
 

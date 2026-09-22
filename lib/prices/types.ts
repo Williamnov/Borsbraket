@@ -5,6 +5,15 @@ export type PriceRequest = {
   symbol: string;
   marketCode: string;
   currency: string;
+  /**
+   * Whether this is an index rather than a share.
+   *
+   * Feeds name the two differently — Yahoo wants a caret and no exchange
+   * for an index — and getting it wrong is worse than getting nothing:
+   * "SPX" without a suffix is a listed company, quoted in the same
+   * currency as the index, so nothing downstream would notice.
+   */
+  isBenchmark: boolean;
 };
 
 /** One quote. `price` is the last traded price in the instrument's own currency. */
