@@ -45,12 +45,13 @@ type LeagueValue = {
   profileMap: Map<string, Profile>;
   rounds: Round[];
   settings: LeagueSettings;
+  /** The pickable lists. Always subscribed: a few dozen documents. */
+  markets: Market[];
   loading: boolean;
   error: string | null;
 
   instruments: Instrument[];
   instrumentMap: Map<string, Instrument>;
-  markets: Market[];
   universeLoading: boolean;
 
   /** Called by useUniverse; starts the instruments/markets listeners. */
@@ -60,7 +61,7 @@ type LeagueValue = {
 const FALLBACK_SETTINGS: LeagueSettings = {
   leagueName: "BörsBråket",
   picksPerRound: 5,
-  minMarketCapMusd: 300,
+  minMarketCapMusd: 0,
 };
 
 const LeagueContext = createContext<LeagueValue>({
@@ -68,11 +69,11 @@ const LeagueContext = createContext<LeagueValue>({
   profileMap: new Map(),
   rounds: [],
   settings: FALLBACK_SETTINGS,
+  markets: [],
   loading: true,
   error: null,
   instruments: [],
   instrumentMap: new Map(),
-  markets: [],
   universeLoading: true,
   requestUniverse: () => {},
 });
@@ -99,10 +100,14 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
   const profiles = useCollection<Profile>("profiles", ready);
   const rounds = useCollection<Round>("rounds", ready);
   const settings = useCollection<LeagueSettings>("settings", ready);
+  // Markets moved out of the on-request half: there are a few dozen of
+  // them, the month page needs them to offer a choice before it knows
+  // which instruments to load, and they cost about as much as one
+  // player's profile.
+  const markets = useCollection<Market>("markets", ready);
 
   const universeOn = ready && wantUniverse;
   const instruments = useCollection<Instrument>("instruments", universeOn);
-  const markets = useCollection<Market>("markets", universeOn);
 
   const value = useMemo<LeagueValue>(() => {
     const profileList = profiles.data.map((p) => ({ ...p, uid: p.id }));
@@ -123,13 +128,13 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
         picksPerRound: league?.picksPerRound ?? FALLBACK_SETTINGS.picksPerRound,
         minMarketCapMusd: league?.minMarketCapMusd ?? FALLBACK_SETTINGS.minMarketCapMusd,
       },
-      loading: profiles.loading || rounds.loading || settings.loading,
+      markets: [...markets.data].sort((a, b) => a.sortOrder - b.sortOrder),
+      loading: profiles.loading || rounds.loading || settings.loading || markets.loading,
       error: profiles.error ?? rounds.error ?? settings.error,
 
       instruments: instruments.data,
       instrumentMap,
-      markets: [...markets.data].sort((a, b) => a.sortOrder - b.sortOrder),
-      universeLoading: !wantUniverse || instruments.loading || markets.loading,
+      universeLoading: !wantUniverse || instruments.loading,
 
       requestUniverse,
     };

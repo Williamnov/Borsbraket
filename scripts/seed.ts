@@ -110,7 +110,7 @@ async function main(): Promise<void> {
 
   await db
     .doc("settings/league")
-    .set({ leagueName: "BörsBråket", picksPerRound: 5, minMarketCapMusd: 300 }, { merge: true });
+    .set({ leagueName: "BörsBråket", picksPerRound: 5, minMarketCapMusd: 0 }, { merge: true });
   console.log("  league settings");
 
   const adminEmail = adminEmailArg();

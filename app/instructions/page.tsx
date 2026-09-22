@@ -124,12 +124,13 @@ export default function InstructionsPage() {
               </p>
             </div>
             <div className="guide-card">
-              <h3>Curated list, not penny stocks</h3>
+              <h3>A list, not a filter</h3>
               <p>
                 Only instruments an admin has marked eligible can be picked, checked when your picks
-                are saved. The test is <strong>company size, not share price</strong> — Lloyds and
-                Vodafone trade under a pound and are FTSE 100 members. Ask an admin to add anything
-                missing; it takes seconds.
+                are saved. There is <strong>no size floor</strong>: Stockholm&rsquo;s Mid Cap, Small
+                Cap, First North and Spotlight lists are all in, micro caps included, so a
+                well-judged small company counts the same as a well-judged large one. Ask an admin
+                to add anything missing; it takes seconds.
               </p>
             </div>
             <div className="guide-card">

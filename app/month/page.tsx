@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { PickEditor } from "@/components/PickEditor";
 import {
@@ -16,8 +16,16 @@ import {
   WeekBars,
   useColumnSort,
 } from "@/components/ui";
-import { useCountdown, useMyPicks, useRoundPicks, useRoundPrices, useSubmissions } from "@/lib/hooks";
-import { useLeagueBase, useUniverse } from "@/components/LeagueProvider";
+import {
+  useBenchmarks,
+  useCountdown,
+  useMarketInstruments,
+  useMyPicks,
+  useRoundPicks,
+  useRoundPrices,
+  useSubmissions,
+} from "@/lib/hooks";
+import { useLeagueBase } from "@/components/LeagueProvider";
 import { instrumentReturn, roundPhase, scoreRound, sortEntries, weeklyPath, type EntrySort } from "@/lib/scoring";
 import { displayName, formatDate, formatPercent, monthLabel } from "@/lib/format";
 import { toDate } from "@/lib/types";
@@ -35,8 +43,22 @@ export default function MonthPage() {
 
 function MonthView() {
   const { profile } = useAuth();
-  const { profiles, profileMap, rounds, settings, loading } = useLeagueBase();
-  const { instruments, markets, loading: universeLoading } = useUniverse();
+  // Markets come with the shared base now: a few dozen documents, and
+  // the page needs them to offer a choice before it knows which
+  // instruments to load. The instruments themselves arrive one market at
+  // a time — see useMarketInstruments — and the benchmarks are two.
+  const { profiles, profileMap, rounds, settings, markets, loading } = useLeagueBase();
+  const { benchmarks: benchmarkInstruments } = useBenchmarks(true);
+
+  const enabledMarkets = useMemo(() => markets.filter((m) => m.isEnabled), [markets]);
+  const [marketCode, setMarketCode] = useState("");
+  useEffect(() => {
+    if (marketCode && enabledMarkets.some((m) => m.code === marketCode)) return;
+    if (enabledMarkets.length > 0) setMarketCode(enabledMarkets[0].code);
+  }, [enabledMarkets, marketCode]);
+
+  const { instruments: marketInstruments, loading: instrumentsLoading } =
+    useMarketInstruments(marketCode || null);
 
   const round = useMemo(() => {
     const unsettled = rounds.filter((r) => r.status !== "settled");
@@ -60,11 +82,10 @@ function MonthView() {
 
   const benchmarks = useMemo(
     () =>
-      instruments
-        .filter((i) => i.isBenchmark)
+      benchmarkInstruments
         .map((i) => ({ instrument: i, ...instrumentReturn(prices.get(i.id)) }))
         .filter((b) => b.ret !== null),
-    [instruments, prices],
+    [benchmarkInstruments, prices],
   );
 
   const { sortBy, direction, onSort } = useColumnSort<EntrySort>("rank", ASC_FIRST);
@@ -74,9 +95,10 @@ function MonthView() {
     [entries, sortBy, direction, profileMap],
   );
 
-  // The universe arrives after the core data, because asking for it is
-  // what starts its listeners. PickEditor needs it, so wait for both.
-  if (loading || universeLoading) return <Empty>Loading the month…</Empty>;
+  // Only the shared base is waited on. The selected market's instruments
+  // load behind their own flag, so choosing a market with three hundred
+  // names in it does not blank the whole page while they arrive.
+  if (loading) return <Empty>Loading the month…</Empty>;
   if (!round || !phase) {
     return (
       <>
@@ -113,8 +135,11 @@ function MonthView() {
             <PickEditor
               round={round}
               uid={profile.uid}
-              instruments={instruments}
+              instruments={marketInstruments}
               markets={markets}
+              marketCode={marketCode}
+              onMarketChange={setMarketCode}
+              instrumentsLoading={instrumentsLoading}
               myPicks={myPicks}
               maxPicks={maxPicks}
             />

@@ -15,7 +15,7 @@ invite-only. Anyone can sign in; an admin approves the account before it can see
 
 | | |
 |---|---|
-| **Five stocks** | Equal weight, one entry per ticker, no penny stocks |
+| **Five stocks** | Equal weight, one entry per ticker |
 | **Picks lock** | A few days into the month. After that, nothing moves |
 | **Sealed** | Other players' picks are not sent to your browser at all while the month is open |
 | **Four checkpoints** | Prices weekly, measured from a baseline taken *at the lock* |

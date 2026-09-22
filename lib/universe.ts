@@ -5,13 +5,17 @@
  * exchanges, the large continental European venues and Tokyo and Sydney.
  * Disable a market in the admin panel to close it.
  *
- * INSTRUMENTS seeds established companies only, and only where the
- * listing is unambiguous. The Nordic growth lists (First North,
- * Spotlight, NGM, Nordic SME) and the Mid/Small Cap segments are seeded
- * EMPTY on purpose: segment membership is reshuffled every year, so
- * rather than guess, add those names from the admin panel. Nothing can
- * be picked that is not in this collection.
+ * INSTRUMENTS is the hand-kept part: the large caps and the main
+ * international venues, where the listing is unambiguous and changes
+ * rarely. The Stockholm segment lists — Mid Cap, Small Cap, First North
+ * and Spotlight — come from universe.generated.ts, which is produced by
+ * scripts/resolve-tickers.mjs from published index membership. Six
+ * hundred names is not something to type.
+ *
+ * Nothing can be picked that is not in this collection.
  */
+
+import { STOCKHOLM_SEGMENTS } from "./universe.generated";
 
 export type MarketSeed = {
   code: string;
@@ -113,41 +117,23 @@ export const INSTRUMENTS: InstrumentSeed[] = [
   ]),
 
   /*
-   * The first entries in a segment list that was deliberately left empty.
+   * The Stockholm segment lists — Mid Cap, Small Cap, First North and
+   * Spotlight — live in universe.generated.ts, because they are six
+   * hundred names and nobody should be typing those.
    *
-   * Every name here is confirmed on Nasdaq Stockholm and quoted in SEK,
-   * which is the part that has to be right: the market code is what the
-   * fetcher turns into an exchange suffix, and every SE_* code maps to
-   * ".ST", so pricing does not care which segment a company sits in.
+   * They are produced by scripts/resolve-tickers.mjs, which takes the
+   * published index membership in scripts/data/ and matches it against
+   * real Stockholm listings to get a ticker for each. Anything that does
+   * not match cleanly is printed rather than guessed at, because a wrong
+   * ticker does not fail — it quietly prices a different company for
+   * somebody's month.
    *
-   * Which segment it sits in is the softer claim. Nasdaq reshuffles Large
-   * / Mid / Small every year on market capitalisation, and these were
-   * placed by size rather than read off a current constituent list, so
-   * treat the segment as a label to correct from the admin panel rather
-   * than a fact. Moving one is a dropdown; nothing downstream breaks.
+   * ShaMaran is the one worth knowing about: it trades as a Swedish
+   * depository receipt, so its symbol carries "SDB". The existing
+   * convention handles it, because a space becomes a hyphen on the way
+   * to the feed exactly as it does for the B-shares.
    */
-  ...list("SE_MID", "SEK", [
-    ["BUFAB", "Bufab"], ["STORY B", "Storytel B"], ["VBG B", "VBG Group B"],
-  ]),
-
-  ...list("SE_SMALL", "SEK", [
-    ["CANTA", "Cantargia"], ["CARA", "Carasent"], ["CTEK", "CTEK"],
-    ["PIERCE", "Pierce Group"],
-  ]),
-
-  /*
-   * First North, also previously empty.
-   *
-   * ShaMaran trades in Stockholm as a Swedish depository receipt rather
-   * than an ordinary share, which is why the symbol carries "SDB" — and
-   * why it is worth noting that the existing convention already handles
-   * it. A space becomes a hyphen on the way to the feed, exactly as it
-   * does for the B-shares, so "SNM SDB" reaches Yahoo as "SNM-SDB.ST"
-   * with nothing special added. The plain ticker finds nothing at all.
-   */
-  ...list("SE_FN", "SEK", [
-    ["SNM SDB", "ShaMaran Petroleum SDB"],
-  ]),
+  ...STOCKHOLM_SEGMENTS,
 
   ...list("FI_LARGE", "EUR", [
     ["ELISA", "Elisa"], ["FORTUM", "Fortum"], ["KESKOB", "Kesko B"], ["KNEBV", "Kone B"],

@@ -377,6 +377,49 @@ export function useChatUnread(
   return unread;
 }
 
+/**
+ * The instruments of one market, and no others.
+ *
+ * The picker used to subscribe to the whole `instruments` collection so
+ * that its search could cover every market at once. That was affordable
+ * at 460 documents and stops being affordable as the Stockholm segment
+ * lists fill: First North alone is about 300 names, and the collection
+ * heads past a thousand. Every cold visit to the month page paid for all
+ * of them, which is the shape of the read that exhausted the daily quota
+ * once already.
+ *
+ * Reading one market at a time caps that at the largest single list
+ * rather than the sum of them, and it stays capped however many markets
+ * are added later. The cost is that the search box covers the market you
+ * are looking at instead of all of them — see the note in PickEditor.
+ *
+ * A `where` on one field needs no composite index.
+ */
+export function useMarketInstruments(marketCode: string | null) {
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!marketCode) {
+      setInstruments([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = onSnapshot(
+      query(collection(firestore(), "instruments"), where("marketCode", "==", marketCode)),
+      (snap) => {
+        setInstruments(snap.docs.map((d) => ({ ...(d.data() as Instrument), id: d.id })));
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+    return unsubscribe;
+  }, [marketCode]);
+
+  return { instruments, loading };
+}
+
 /** How many price runs the admin panel keeps on screen. */
 const PRICE_RUN_WINDOW = 15;
 

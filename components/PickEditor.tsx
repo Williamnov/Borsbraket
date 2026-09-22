@@ -7,25 +7,46 @@ import type { Instrument, Market, PickItem, PicksDoc, Round } from "@/lib/types"
 
 type Selection = Record<string, PickItem>;
 
+/**
+ * Picking is market by market, deliberately.
+ *
+ * There used to be an "All markets" option, and the search box covered
+ * every instrument in the league at once. That meant the page subscribed
+ * to the whole `instruments` collection — fine at 460 documents, not fine
+ * once the Stockholm segment lists are filled and it runs past a
+ * thousand, because every cold visit paid for all of them and that is
+ * the read that exhausted the free quota once already.
+ *
+ * So a market is always selected, and only that market is loaded. The
+ * search box searches within it. That is the trade: a list you have to
+ * choose from first, in exchange for a read cost that no longer grows
+ * with the size of the universe.
+ */
 export function PickEditor({
   round,
   uid,
   instruments,
   markets,
+  marketCode,
+  onMarketChange,
+  instrumentsLoading,
   myPicks,
   maxPicks,
 }: {
   round: Round;
   uid: string;
+  /** Only the selected market's instruments. */
   instruments: Instrument[];
   markets: Market[];
+  marketCode: string;
+  onMarketChange: (code: string) => void;
+  instrumentsLoading: boolean;
   myPicks: PicksDoc | null;
   maxPicks: number;
 }) {
   const [selection, setSelection] = useState<Selection>(() => ({ ...(myPicks?.picks ?? {}) }));
   const [touched, setTouched] = useState(false);
   const [search, setSearch] = useState("");
-  const [marketFilter, setMarketFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
 
@@ -45,13 +66,12 @@ export function PickEditor({
   const results = useMemo(() => {
     const term = search.trim().toLowerCase();
     return pickable
-      .filter((i) => (marketFilter ? i.marketCode === marketFilter : true))
       .filter((i) =>
         term ? i.symbol.toLowerCase().includes(term) || i.name.toLowerCase().includes(term) : true,
       )
       .sort((a, b) => a.symbol.localeCompare(b.symbol))
       .slice(0, 40);
-  }, [pickable, search, marketFilter]);
+  }, [pickable, search]);
 
   const chosen = Object.entries(selection).sort((a, b) => a[1].slot - b[1].slot);
   const full = chosen.length >= maxPicks;
@@ -171,12 +191,11 @@ export function PickEditor({
           style={{ flex: "2 1 220px" }}
         />
         <select
-          value={marketFilter}
-          onChange={(e) => setMarketFilter(e.target.value)}
-          aria-label="Filter by market"
+          value={marketCode}
+          onChange={(e) => onMarketChange(e.target.value)}
+          aria-label="Choose a market"
           style={{ flex: "1 1 180px" }}
         >
-          <option value="">All markets</option>
           {markets
             .filter((m) => m.isEnabled)
             .map((m) => (
@@ -195,8 +214,13 @@ export function PickEditor({
           overflowY: "auto",
         }}
       >
-        {results.length === 0 ? (
-          <div className="empty">No eligible stock matches that. Ask an admin to add it.</div>
+        {instrumentsLoading ? (
+          <div className="empty">Loading this market…</div>
+        ) : results.length === 0 ? (
+          <div className="empty">
+            No eligible stock in this market matches that. Try another market, or ask an admin to
+            add it.
+          </div>
         ) : (
           results.map((instrument) => {
             const isChosen = Boolean(selection[instrument.id]);
