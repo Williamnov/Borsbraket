@@ -63,6 +63,23 @@ looked like success:
    metrics until tokens are arriving, *then* enable enforcement. That order matters — enforcing
    first locks every player out.
 
+## The price feed does not work from GitHub Actions
+
+Yahoo refuses GitHub's address ranges outright. Two price runs on two different runners both came
+back `HTTP 429` on the first request, and a probe from a third runner found no way in at all:
+`query1` and `query2`, `spark` and `chart`, and a cookie-and-crumb session of the kind `yfinance`
+uses were all 429. Stooq, the obvious fallback, still answers its challenge page. This is not
+pacing — the runs ask for two symbols in one request.
+
+The code is correct and the symbols are right; the address is the problem. So the options are:
+
+1. **Enter prices by hand** from the admin grid, which is what happens today and works.
+2. **Run `scripts/fetch-prices.mjs` from a machine with a domestic address** — a laptop on a cron,
+   or anything not in a datacentre. It needs only `SITE_URL` and `CRON_SECRET` and posts back to
+   the same route, so nothing else changes.
+3. **Find a feed that serves datacentre addresses.** Twelve Data does, but not the Nordics without
+   paying. This is the one that would settle it properly.
+
 ## Open decisions
 
 - **Cloud Storage for profile pictures is not available.** The project is on the Spark plan and
@@ -71,9 +88,21 @@ looked like success:
   to Blaze is what unblocks it — and would also lift the daily read cap. In practice this is cheaper
   than it sounds: a 192px JPEG lands around 10 KB, so the 200 KB ceiling in the rules is a guard
   rail and not the going rate, and the whole league's pictures are a few hundred kilobytes.
-- **Mid Cap, Small Cap and the Nordic growth lists are still seeded empty**, and market caps are all
-  null. Segment membership reshuffles annually, so a seeded guess would put wrong names in front of
-  players. Needs a current constituent list from somewhere trustworthy, or admin-panel entry.
+- **The growth lists need a constituent list from somewhere.** Mid Cap and Small Cap have a handful
+  of names now and First North has one, all added on request and each confirmed against the feed
+  before being written down. Spotlight, NGM and Nordic SME are still empty. Filling them properly
+  means First North Stockholm (~400 companies) and Spotlight (~170), which is not something to type
+  from memory: a wrong ticker does not fail, it prices a different company.
+
+  The obvious free sources are closed. Nasdaq's Nordic `DataFeedProxy` is retired and redirects to a
+  marketing page, Spotlight's own market overview renders its table in the browser, and Avanza's
+  screener endpoints 404. What is left: a paid reference-data feed — Modular Finance's own Holdings
+  or Dataflow would do exactly this — or a CSV somebody exports by hand and drops into
+  `lib/universe.ts`, or adding names one at a time from the admin panel as players ask for them.
+
+  Market caps are all null either way, so the Large/Mid/Small labels are placement by judgement
+  rather than by the current Nasdaq segmentation. Nothing depends on them but the heading a company
+  appears under, and moving one is a dropdown in the admin panel.
 - **`w0` changed meaning.** It is now the price at the lock, not the price at the start of the
   month — measuring from the 1st handed whoever submitted last three days of hindsight. Any prices
   recorded before this change still carry the old meaning. There were no settled months at the time,
