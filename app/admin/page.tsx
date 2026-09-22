@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { Approvals } from "@/components/admin/Approvals";
 import { PriceGrid } from "@/components/admin/PriceGrid";
+import { PriceRuns } from "@/components/admin/PriceRuns";
 import { RoundAdmin } from "@/components/admin/RoundAdmin";
 import { UniverseAdmin } from "@/components/admin/UniverseAdmin";
 import { Empty, PageHead, RequirePlayer } from "@/components/ui";
@@ -66,6 +67,8 @@ function AdminPanels() {
             prices={prices}
           />
         ) : null}
+
+        <PriceRuns />
 
         <UniverseAdmin instruments={instruments} markets={markets} />
       </div>

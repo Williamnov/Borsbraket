@@ -46,6 +46,26 @@ async function get(path) {
 
 const { response, body } = await get("/");
 
+/**
+ * Did we end up somewhere else entirely?
+ *
+ * This is checked before anything about the page, because everything
+ * after it would be measuring the wrong document. Vercel's Deployment
+ * Protection answers a per-deployment URL with a 302 to
+ * vercel.com/login, and following that gives a perfectly good 200 with
+ * no masthead and no stylesheet — which is indistinguishable from the
+ * blank-page outage this file exists to catch, and was in fact what it
+ * reported on every deploy for four days.
+ */
+const landed = new URL(response.url || `${base}/`);
+const asked = new URL(base);
+check(
+  landed.host === asked.host,
+  "the request stayed on the site",
+  `asked for ${asked.host} and ended up on ${landed.host} — if that is vercel.com, the URL is ` +
+    `behind Deployment Protection and nothing below this line is about your site`,
+);
+
 check(response.status === 200, "GET / returns 200", `got ${response.status}`);
 
 // The server-rendered shell. If this is missing the page never had

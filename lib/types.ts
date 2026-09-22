@@ -261,6 +261,33 @@ export type PriceDoc = {
   updatedAt?: Instant;
 };
 
+/**
+ * One row per run of the price job.
+ *
+ * Written by the cron, read by the admin panel, and the only record that
+ * a week was ever attempted. A job whose failure mode is silence needs
+ * somewhere its silence becomes visible: `written` short of `awaiting`,
+ * or no row at all for a week, is what a missed checkpoint looks like.
+ */
+export type PriceRun = {
+  id: string;
+  roundId: string;
+  /** 0-4; 0 is the baseline taken at the lock. */
+  checkpoint: number;
+  field: string;
+  dueAt: string | null;
+  source: string;
+  written: number;
+  /** Instruments this run wanted and did not get. */
+  awaiting: number;
+  /** A sample of earlier checkpoints still empty, capped when written. */
+  gaps: string[];
+  gapCount: number;
+  /** Whatever went wrong, if anything did. */
+  note: string | null;
+  createdAt?: Instant;
+};
+
 export type LeagueSettings = {
   leagueName: string;
   picksPerRound: number;

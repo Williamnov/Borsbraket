@@ -67,18 +67,24 @@ because each one failed in a way that looked like success:
 - **`useRoundBundles` still recomputes settled months** on the league, history and profile pages.
   They now read cache-first, which is most of the cost, but a per-round summary document written
   once at settle time would collapse it properly. Fine at six months; noticeable at three seasons.
-- **The universe is 403 instruments now, not the ~300 it was** when the quota blew up. It is still
-  the largest single read in a cold visit, and `/history` pulls all of it just to put names against
-  tickers. A settled month's summary document would take that page off the universe entirely.
-- **`priceRuns` is written and never read.** The rules give it to admins and no page touches it, so
-  "one row per cron run, so a missed week is visible" is true only in the Firebase console.
+- **The universe is 403 instruments now, not the ~300 it was** when the quota blew up. `/month` and
+  the admin panel genuinely need it. `/history` used to buy all of it to draw two benchmark pills
+  and now queries `isBenchmark` instead, which is a handful of documents — the picks carry their own
+  symbols and names, so no page needs the universe to render a table.
 - **Tests cover the rules and the scoring.** `tests/rules` exercises the picks seal, the chat rate
   limit, the profile/contacts split and the legacy-handle path; `tests/unit` covers compounding,
   equal weighting, the sort tie-breaks and the checkpoint model. There is no test of the pages or
   the price route.
 - **The price job's failure is visible; a Vercel cron's absence still is not.** A failed GitHub
   Action emails you, which is why the fetching moved there. The daily Vercel cron remains as a
-  backstop and nothing notices if it stops.
+  backstop and nothing notices if it stops. The **Price runs** panel in the admin page is where a
+  missed week shows up: no row for a week, or `awaiting` above zero, is what one looks like.
+- **The post-deploy smoke check had never run.** It pointed at `deployment_status.environment_url`,
+  which is Vercel's per-deployment URL, which sits behind Deployment Protection and answers 302 to
+  `vercel.com/login`. The script follows redirects, so it had been checking Vercel's login page —
+  200, no masthead, no stylesheet — and failing every deploy since it was written. It now checks the
+  public alias, refuses to grade a page it was redirected away from, and skips preview deployments,
+  which have no URL it can reach.
 
 ## Things worth not re-litigating
 

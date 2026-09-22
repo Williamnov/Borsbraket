@@ -8,6 +8,24 @@ name: Smoke
 # the real thing rather than guessing at a delay. The daily run is there
 # because a site can also break without anyone pushing — an expired key,
 # a revoked service account, a Firebase project change.
+#
+# ── Why it does not use environment_url ───────────────────────────────
+#
+# Because it did, and the check never once ran. Vercel's per-deployment
+# URL sits behind Deployment Protection, so a request to it answers 302
+# to vercel.com/login. smoke.mjs follows redirects, so it dutifully
+# checked Vercel's login page: 200, no masthead, no stylesheet, and an
+# enforcing CSP that is Vercel's and not ours. Every deploy since this
+# workflow was written failed on that, which is worse than not having
+# the check at all — a red tick that is always red teaches you to stop
+# reading it, and this is the one alarm that stands between a green
+# build and a blank white site.
+#
+# So a production deployment is checked at the alias, which is public.
+# Preview deployments are no longer checked: there is no public URL for
+# them, and the way to get one is a protection-bypass token, which is a
+# real secret to store for a check that the production run makes a
+# moment later anyway.
 
 on:
   deployment_status:
@@ -24,12 +42,12 @@ jobs:
   smoke:
     name: Check the deployed site
     # A deployment_status event fires for every state change, so this
-    # waits for the successful one. Preview deploys are checked too, at
-    # their own URL — a preview that is blank is worth knowing about
-    # before it becomes production.
+    # waits for the successful one — and only for production, since that
+    # is the only deployment with a URL this can reach.
     if: >-
       github.event_name != 'deployment_status' ||
-      github.event.deployment_status.state == 'success'
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment_status.environment == 'Production')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,10 +58,12 @@ jobs:
 
       # No npm ci: the script is plain node with global fetch and no
       # dependencies, so there is nothing to install.
+      # SITE_URL is a repository variable, so a custom domain does not
+      # mean editing this file. It falls back to the Vercel alias.
       - name: Smoke
         run: node scripts/smoke.mjs "$URL"
         env:
           URL: >-
             ${{ github.event.inputs.url
-                || github.event.deployment_status.environment_url
+                || vars.SITE_URL
                 || 'https://borsbraket.vercel.app' }}

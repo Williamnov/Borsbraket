@@ -241,9 +241,19 @@ async function writeQuotes(
  * the auth token, and there is no account with that uid.
  *
  * Each announcement is flagged on the round, so a job that runs every
- * day says each thing exactly once. The flag is set in the same batch as
- * the message, so a crash between them cannot leave the league
- * permanently un-notified or permanently re-notified.
+ * day says each thing exactly once. Two details make "exactly once" true
+ * rather than nearly true:
+ *
+ *  - The flag is read and set inside a transaction with the message, so
+ *    two runs that overlap cannot both decide the flag is unset and both
+ *    post. The flags on `rounds` passed in here came from a snapshot
+ *    taken before any of this, which is a fine filter and not a decision.
+ *
+ *  - A round that opened *and* locked before anyone was being told about
+ *    it gets its open flag set without a message. Announcing "picks seal
+ *    on the 4th" beside "picks are sealed" reads as a bug, because it is
+ *    one — and the only rounds this can happen to are the ones that
+ *    predate the announcements.
  */
 async function announce(db: Db, rounds: Round[], now: Date): Promise<string[]> {
   const said: string[] = [];
@@ -254,18 +264,29 @@ async function announce(db: Db, rounds: Round[], now: Date): Promise<string[]> {
     const opens = toDate(round.opensAt);
     const locks = toDate(round.locksAt);
     const label = monthLabel(round.id);
+    const locked = Boolean(locks && now >= locks);
 
-    const post = async (body: string, flag: "announcedOpen" | "announcedLock") => {
-      const batch = db.batch();
-      batch.set(db.collection("chat").doc(), {
-        uid: SYSTEM_UID,
-        body,
-        parentId: null,
-        createdAt: new Date(),
+    /**
+     * Claims the flag and, if `body` is given, posts the message with it.
+     * Returns false when another run got there first.
+     */
+    const claim = async (flag: "announcedOpen" | "announcedLock", body: string | null) => {
+      const ref = db.doc(`rounds/${round.id}`);
+      const posted = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (snap.get(flag) === true) return false;
+        if (body !== null) {
+          tx.set(db.collection("chat").doc(), {
+            uid: SYSTEM_UID,
+            body,
+            parentId: null,
+            createdAt: new Date(),
+          });
+        }
+        tx.set(ref, { [flag]: true }, { merge: true });
+        return true;
       });
-      batch.set(db.doc(`rounds/${round.id}`), { [flag]: true }, { merge: true });
-      await batch.commit();
-      said.push(`${round.id}:${flag}`);
+      if (posted) said.push(`${round.id}:${flag}${body === null ? " (silent)" : ""}`);
     };
 
     if (!round.announcedOpen && opens && now >= opens) {
@@ -278,20 +299,22 @@ async function announce(db: Db, rounds: Round[], now: Date): Promise<string[]> {
             timeZone: "UTC",
           })
         : null;
-      await post(
-        `${label} is open. Up to five picks each, and they seal` +
-          (when ? ` on ${when} UTC.` : " at the lock.") +
-          " Nobody sees anyone else's until then.",
+      await claim(
         "announcedOpen",
+        locked
+          ? null
+          : `${label} is open. Up to five picks each, and they seal` +
+              (when ? ` on ${when} UTC.` : " at the lock.") +
+              " Nobody sees anyone else's until then.",
       );
     }
 
-    if (!round.announcedLock && locks && now >= locks) {
-      await post(
+    if (!round.announcedLock && locked) {
+      await claim(
+        "announcedLock",
         `Picks are sealed for ${label}. Everyone's holdings are now visible, ` +
           "and the baseline price is the one taken at the lock. Four weekly " +
           "checkpoints from here.",
-        "announcedLock",
       );
     }
   }

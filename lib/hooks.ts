@@ -15,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { firestore } from "@/lib/firebase/client";
 import { chatReadMark, subscribeChatRead } from "@/lib/chatRead";
-import type { ChatMessage, Contact, PicksDoc, PriceDoc } from "@/lib/types";
+import type { ChatMessage, Contact, Instrument, PicksDoc, PriceDoc, PriceRun } from "@/lib/types";
 
 type Loadable<T> = { data: T; loading: boolean; error: string | null };
 
@@ -62,6 +62,46 @@ export function useCollection<T>(path: string, enabled: boolean): Loadable<(T & 
  * components/LeagueProvider.tsx as a single set of listeners mounted
  * once in the root layout — see the note there for why.
  */
+
+/**
+ * The benchmark instruments, and nothing else from the universe.
+ *
+ * The history page wants a couple of index lines beside each settled
+ * month and needs no other instrument at all: the picks documents carry
+ * their own symbol and name, so the tables never consult the universe.
+ * It was calling useUniverse() anyway, which bought all four hundred
+ * instruments to render two pills — the single largest read on the page,
+ * and the largest avoidable one in the app.
+ *
+ * A `where` on a single field needs no composite index, so this costs
+ * the handful of documents it actually returns.
+ */
+export function useBenchmarks(enabled: boolean) {
+  const [benchmarks, setBenchmarks] = useState<Instrument[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!enabled) {
+      setBenchmarks([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = onSnapshot(
+      query(collection(firestore(), "instruments"), where("isBenchmark", "==", true)),
+      (snap) => {
+        setBenchmarks(snap.docs.map((d) => ({ ...(d.data() as Instrument), id: d.id })));
+        setLoading(false);
+      },
+      // A benchmark line missing is a cosmetic loss; the month's table
+      // beside it is the part that matters and does not depend on this.
+      () => setLoading(false),
+    );
+    return unsubscribe;
+  }, [enabled]);
+
+  return { benchmarks, loading };
+}
 
 /** Live prices for one round. */
 export function useRoundPrices(roundId: string | null) {
@@ -335,6 +375,47 @@ export function useChatUnread(
   }, [uid, enabled, effective]);
 
   return unread;
+}
+
+/** How many price runs the admin panel keeps on screen. */
+const PRICE_RUN_WINDOW = 15;
+
+/**
+ * The last few runs of the price job, newest first.
+ *
+ * Admin-only, like the collection it reads. This exists because the
+ * rows did not: the cron has been writing one per run since it was
+ * built, the rules give them to admins, and nothing in the app ever
+ * showed them — so "one row per cron run, so a missed week is visible"
+ * was true only to somebody with the Firebase console open.
+ */
+export function usePriceRuns(enabled: boolean) {
+  const [runs, setRuns] = useState<PriceRun[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!enabled) {
+      setRuns([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const unsubscribe = onSnapshot(
+      query(
+        collection(firestore(), "priceRuns"),
+        orderBy("createdAt", "desc"),
+        limit(PRICE_RUN_WINDOW),
+      ),
+      (snap) => {
+        setRuns(snap.docs.map((d) => ({ ...(d.data() as PriceRun), id: d.id })));
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+    return unsubscribe;
+  }, [enabled]);
+
+  return { runs, loading };
 }
 
 /**

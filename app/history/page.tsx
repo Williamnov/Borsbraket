@@ -12,8 +12,8 @@ import {
   Value,
   useColumnSort,
 } from "@/components/ui";
-import { useRoundBundles } from "@/lib/hooks";
-import { useLeagueBase, useUniverse } from "@/components/LeagueProvider";
+import { useBenchmarks, useRoundBundles } from "@/lib/hooks";
+import { useLeagueBase } from "@/components/LeagueProvider";
 import { instrumentReturn, scoreRound, sortEntries, type EntrySort } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
 import type { Profile, ScoredEntry } from "@/lib/types";
@@ -32,7 +32,9 @@ export default function HistoryPage() {
 function History() {
   const { profile } = useAuth();
   const { profileMap, rounds, loading } = useLeagueBase();
-  const { instruments, loading: universeLoading } = useUniverse();
+  // Benchmarks only. Nothing on this page reads the rest of the universe
+  // — the picks carry their own symbols and names.
+  const { benchmarks, loading: benchmarksLoading } = useBenchmarks(true);
 
   const settled = useMemo(
     () => rounds.filter((r) => r.status === "settled").sort((a, b) => b.id.localeCompare(a.id)),
@@ -72,7 +74,7 @@ function History() {
     return { best, worst, bestMonth };
   }, [scoredByRound]);
 
-  if (loading || universeLoading || bundlesLoading) return <Empty>Loading history…</Empty>;
+  if (loading || benchmarksLoading || bundlesLoading) return <Empty>Loading history…</Empty>;
 
   if (settled.length === 0) {
     return (
@@ -138,8 +140,7 @@ function History() {
           const entries = scoredByRound.get(round.id) ?? [];
           const winner = entries[0];
           const bundle = bundles.get(round.id);
-          const benchmark = instruments
-            .filter((i) => i.isBenchmark)
+          const benchmark = benchmarks
             .map((i) => ({ symbol: i.symbol, ...instrumentReturn(bundle?.prices.get(i.id)) }))
             .filter((b) => b.ret !== null);
 
