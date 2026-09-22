@@ -112,6 +112,24 @@ export const INSTRUMENTS: InstrumentSeed[] = [
     ["VOLCAR B", "Volvo Car B"], ["VOLV B", "Volvo B"],
   ]),
 
+  /*
+   * The first entries in a segment list that was deliberately left empty.
+   *
+   * Every name here is confirmed on Nasdaq Stockholm and quoted in SEK,
+   * which is the part that has to be right: the market code is what the
+   * fetcher turns into an exchange suffix, and every SE_* code maps to
+   * ".ST", so pricing does not care which segment a company sits in.
+   *
+   * Which segment it sits in is the softer claim. Nasdaq reshuffles Large
+   * / Mid / Small every year on market capitalisation, and these were
+   * placed by size rather than read off a current constituent list, so
+   * treat the segment as a label to correct from the admin panel rather
+   * than a fact. Moving one is a dropdown; nothing downstream breaks.
+   */
+  ...list("SE_SMALL", "SEK", [
+    ["CANTA", "Cantargia"], ["CARA", "Carasent"], ["PIERCE", "Pierce Group"],
+  ]),
+
   ...list("FI_LARGE", "EUR", [
     ["ELISA", "Elisa"], ["FORTUM", "Fortum"], ["KESKOB", "Kesko B"], ["KNEBV", "Kone B"],
     ["METSO", "Metso"], ["NESTE", "Neste"], ["NOKIA", "Nokia"], ["ORNBV", "Orion B"],
@@ -174,11 +192,13 @@ export const INSTRUMENTS: InstrumentSeed[] = [
     ["INTU", "Intuit"], ["ISRG", "Intuitive Surgical"], ["KLAC", "KLA Corporation"],
     ["LRCX", "Lam Research"], ["MDLZ", "Mondelez International A"], ["MELI", "MercadoLibre"],
     ["META", "Meta Platforms A"], ["MNST", "Monster Beverage"], ["MRVL", "Marvell Technology"],
-    ["MSFT", "Microsoft"], ["MU", "Micron Technology"], ["NFLX", "Netflix"], ["NVDA", "NVIDIA"],
+    ["MSFT", "Microsoft"], ["MU", "Micron Technology"], ["NBIS", "Nebius Group"],
+    ["NFLX", "Netflix"], ["NVDA", "NVIDIA"],
     ["ODFL", "Old Dominion Freight Line"], ["ORLY", "O'Reilly Automotive"],
     ["PANW", "Palo Alto Networks"], ["PCAR", "PACCAR"], ["PEP", "PepsiCo"],
     ["PLTR", "Palantir Technologies A"], ["PYPL", "PayPal Holdings"], ["QCOM", "Qualcomm"],
-    ["REGN", "Regeneron Pharmaceuticals"], ["SBUX", "Starbucks"], ["SNPS", "Synopsys"],
+    ["REGN", "Regeneron Pharmaceuticals"], ["RKLB", "Rocket Lab"], ["SBUX", "Starbucks"],
+    ["SNPS", "Synopsys"],
     ["TEAM", "Atlassian A"], ["TSLA", "Tesla"], ["TTWO", "Take-Two Interactive"],
     ["TXN", "Texas Instruments"], ["VRTX", "Vertex Pharmaceuticals"], ["WDAY", "Workday A"],
     ["ZS", "Zscaler"],
