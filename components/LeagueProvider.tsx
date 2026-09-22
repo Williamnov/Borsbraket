@@ -150,7 +150,7 @@ export function useLeagueBase() {
  * The pickable universe — instruments and markets.
  *
  * Asking for it is what starts the listeners, so a page that does not
- * call this never reads the ~300 instrument documents.
+ * call this never reads the 450 instrument documents.
  */
 export function useUniverse() {
   const league = useContext(LeagueContext);

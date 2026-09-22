@@ -102,7 +102,7 @@ export function firebaseAuth(): Auth {
  * This is the single largest cost control in the app, and it is here
  * because the project went through the Spark plan's 50,000 reads in a
  * day with one person clicking around. The instruments collection alone
- * is ~300 documents and the league pages subscribe to it; without a
+ * is 450 documents and the league pages subscribe to it; without a
  * cache every visit re-read all of them from the server, and every
  * client-side navigation did it again.
  *

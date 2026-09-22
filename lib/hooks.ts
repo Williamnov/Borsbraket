@@ -69,12 +69,12 @@ export function useCollection<T>(path: string, enabled: boolean): Loadable<(T & 
  * The history page wants a couple of index lines beside each settled
  * month and needs no other instrument at all: the picks documents carry
  * their own symbol and name, so the tables never consult the universe.
- * It was calling useUniverse() anyway, which bought all four hundred
- * instruments to render two pills — the single largest read on the page,
- * and the largest avoidable one in the app.
+ * It was calling useUniverse() anyway, which bought all 450 instruments
+ * to render two pills — the single largest read on the page, and the
+ * largest avoidable one in the app.
  *
  * A `where` on a single field needs no composite index, so this costs
- * the handful of documents it actually returns.
+ * the two documents it actually returns.
  */
 export function useBenchmarks(enabled: boolean) {
   const [benchmarks, setBenchmarks] = useState<Instrument[]>([]);

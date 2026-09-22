@@ -42,8 +42,11 @@ looked like success:
 
 ## Next steps, in order
 
-1. **`npm run seed`** — 178 companies across eight new markets (Xetra, Paris, SIX, Amsterdam,
-   Madrid, Milan, Tokyo, Sydney) are in the code but not in Firestore.
+1. ~~**`npm run seed`**~~ — **done, 2026-09-22.** Firestore now holds 37 markets and 450
+   instruments, 448 of them eligible, plus two benchmarks and `settings/league`. All eight new
+   venues are populated: Xetra 24, Paris 25, SIX 20, Amsterdam 19, Madrid 15, Milan 16, Tokyo 20,
+   Sydney 18. Re-run it whenever `lib/universe.ts` changes — every write is a merge on a stable
+   document id, so it is safe to repeat.
 2. **Two GitHub repository secrets** to switch the price feed on: `SITE_URL` and `CRON_SECRET` (the
    same value as Vercel's). Until they exist the workflow exits green and says so. The price source
    needs no key — see the Twelve Data note below for why it is no longer three secrets.
@@ -86,7 +89,7 @@ looked like success:
   that this is the scoring read path and a wrong summary is a wrong scoreboard, silently. With no
   settled month in the database there is nothing to check a summary against yet, so the honest order
   is: settle a month, then build it, then verify the two agree before the recomputation is removed.
-- **The universe is 403 instruments now, not the ~300 it was** when the quota blew up. `/month` and
+- **The universe is 450 instruments now, not the ~300 it was** when the quota blew up. `/month` and
   the admin panel genuinely need it. `/history` used to buy all of it to draw two benchmark pills
   and now queries `isBenchmark` instead, which is a handful of documents — the picks carry their own
   symbols and names, so no page needs the universe to render a table.
