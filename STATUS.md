@@ -2,15 +2,16 @@
 
 Where the project stands, so you can pick it up without re-reading anything.
 
-Last updated: 2026-09-18
+Last updated: 2026-09-22
 
 ## State
 
 Deployed and running. CI builds it, typechecks it and runs both test suites on every push, and
-`scripts/smoke.mjs` checks the deployed URL after each deploy.
+`scripts/smoke.mjs` checks the deployed URL after each deploy — which, as of today, it genuinely
+does; see the note in Known gaps about the four days it spent grading Vercel's login page.
 
-Three faults were found and fixed the first time it was really exercised, all worth knowing about
-because each one failed in a way that looked like success:
+The faults found so far, all worth knowing about because every one of them failed in a way that
+looked like success:
 
 - **The CSP blanked the site.** A nonce-based policy compiled, built, deployed and served 200s with
   every inline script blocked. Every page here is prerendered, and Next only stamps nonces onto
@@ -25,6 +26,19 @@ because each one failed in a way that looked like success:
 - **The rules were never deployed.** The live ruleset predated the chat entirely, so `chat/`,
   `rateLimits/` and `contacts/` fell to the catch-all deny. The chat showed a permission error; the
   admin panel's address list was broken silently.
+- **The price feed could never have worked.** Twelve Data's free tier is US-only; the README said it
+  covered the Nordics. The workflow had been exiting green for days without making a single call,
+  because its secrets were never set — so the thing that would have exposed it was the one step
+  nobody had taken. Now Yahoo, which covers every market in the universe.
+- **The post-deploy smoke check had never run.** It pointed at Vercel's per-deployment URL, which is
+  behind Deployment Protection, so it followed a 302 to `vercel.com/login` and graded that: 200, no
+  markup, failing every deploy. A check that is always red is one nobody reads, and this was the
+  check standing between a green build and the blank white page above. It now checks the public
+  alias and refuses outright to grade a page it was redirected away from.
+- **The login page went blank without localStorage.** It read the remembered sign-in address inside
+  an effect with no guard, and in a private window the getter throws rather than returning null — so
+  the exception took down the one page a player who cannot get in has to be able to use. Every other
+  storage access in the app was already wrapped; this was the one that was missed.
 
 ## Next steps, in order
 
@@ -65,8 +79,13 @@ because each one failed in a way that looked like success:
 ## Known gaps
 
 - **`useRoundBundles` still recomputes settled months** on the league, history and profile pages.
-  They now read cache-first, which is most of the cost, but a per-round summary document written
-  once at settle time would collapse it properly. Fine at six months; noticeable at three seasons.
+  A per-round summary document written once at settle time would collapse it properly, and that is
+  still the right end state — but it is a lower priority than it reads. A settled round's picks and
+  prices never change again, so the cache-first read means a device pays for each settled month
+  exactly once, ever; the saving is only on a cold cache. Weigh that against the risk, which is
+  that this is the scoring read path and a wrong summary is a wrong scoreboard, silently. With no
+  settled month in the database there is nothing to check a summary against yet, so the honest order
+  is: settle a month, then build it, then verify the two agree before the recomputation is removed.
 - **The universe is 403 instruments now, not the ~300 it was** when the quota blew up. `/month` and
   the admin panel genuinely need it. `/history` used to buy all of it to draw two benchmark pills
   and now queries `isBenchmark` instead, which is a handful of documents — the picks carry their own
@@ -79,19 +98,6 @@ because each one failed in a way that looked like success:
   Action emails you, which is why the fetching moved there. The daily Vercel cron remains as a
   backstop and nothing notices if it stops. The **Price runs** panel in the admin page is where a
   missed week shows up: no row for a week, or `awaiting` above zero, is what one looks like.
-- **The post-deploy smoke check had never run.** It pointed at `deployment_status.environment_url`,
-  which is Vercel's per-deployment URL, which sits behind Deployment Protection and answers 302 to
-  `vercel.com/login`. The script follows redirects, so it had been checking Vercel's login page —
-  200, no masthead, no stylesheet — and failing every deploy since it was written. It now checks the
-  public alias, refuses to grade a page it was redirected away from, and skips preview deployments,
-  which have no URL it can reach.
-
-- **The login page crashed without localStorage.** It read the remembered address inside an effect
-  with no guard, so a private window — where the getter throws rather than returning null — took the
-  whole page down, on the one page a locked-out player has to be able to use. Every other storage
-  access in the app was already wrapped; this one was missed. It now falls back to the prompt, which
-  is what the prompt was there for.
-
 ## Things worth not re-litigating
 
 - Firebase, not Supabase. An earlier Supabase implementation was removed.
