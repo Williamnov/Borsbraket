@@ -1,0 +1,81 @@
+name: Yahoo probe
+
+# Temporary diagnostic. Both scheduled price runs came back 429 from two
+# different runners, which says Yahoo refuses GitHub's address ranges
+# rather than that we asked too fast. This checks whether any route in
+# still works from here before the feed is written off.
+#
+# Delete this file once it has answered.
+
+on: workflow_dispatch
+
+jobs:
+  probe:
+    name: What can a runner reach
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Probe
+        run: |
+          node - <<'JS'
+          const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
+          const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+          async function show(label, url, headers = {}) {
+            try {
+              const r = await fetch(url, { headers: { "user-agent": UA, ...headers } });
+              const t = await r.text();
+              const ok = r.status === 200;
+              const hint = ok ? t.slice(0, 90).replace(/\s+/g, " ") : t.slice(0, 60).replace(/\s+/g, " ");
+              console.log(`${label.padEnd(28)} HTTP ${r.status}  ${hint}`);
+              return { status: r.status, text: t };
+            } catch (e) {
+              console.log(`${label.padEnd(28)} ERROR ${e.message}`);
+              return { status: 0, text: "" };
+            }
+          }
+
+          (async () => {
+            await show("query1 spark", "https://query1.finance.yahoo.com/v8/finance/spark?symbols=AAPL&range=1d&interval=1d");
+            await wait(2000);
+            await show("query2 spark", "https://query2.finance.yahoo.com/v8/finance/spark?symbols=AAPL&range=1d&interval=1d");
+            await wait(2000);
+            await show("query1 chart", "https://query1.finance.yahoo.com/v8/finance/chart/AAPL");
+            await wait(2000);
+            await show("query2 chart", "https://query2.finance.yahoo.com/v8/finance/chart/AAPL");
+            await wait(2000);
+
+            // Cookie + crumb session, the way yfinance does it.
+            const c = await fetch("https://fc.yahoo.com/", { headers: { "user-agent": UA }, redirect: "manual" });
+            const jar = (c.headers.getSetCookie ? c.headers.getSetCookie() : [c.headers.get("set-cookie")])
+              .filter(Boolean).map((x) => x.split(";")[0]).join("; ");
+            console.log(`cookie                       HTTP ${c.status}  ${jar ? jar.slice(0, 40) + "..." : "(none)"}`);
+            await wait(2000);
+
+            if (jar) {
+              const cr = await show("crumb", "https://query1.finance.yahoo.com/v1/test/getcrumb", { cookie: jar });
+              await wait(2000);
+              if (cr.status === 200 && cr.text && !cr.text.includes("<")) {
+                await show(
+                  "v7 quote with crumb",
+                  `https://query1.finance.yahoo.com/v7/finance/quote?symbols=AAPL,%5EGSPC&crumb=${encodeURIComponent(cr.text)}`,
+                  { cookie: jar },
+                );
+                await wait(2000);
+                await show(
+                  "chart with session",
+                  "https://query1.finance.yahoo.com/v8/finance/chart/ERIC-B.ST",
+                  { cookie: jar },
+                );
+                await wait(2000);
+              }
+            }
+
+            // The alternative the README wrote off in 2025; worth re-checking.
+            await show("stooq", "https://stooq.com/q/l/?s=eric-b.st&f=sd2t2ohlcv&h&e=csv");
+          })();
+          JS
