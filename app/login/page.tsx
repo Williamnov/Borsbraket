@@ -14,6 +14,44 @@ import { firebaseAuth } from "@/lib/firebase/client";
 
 const STORAGE_KEY = "borsbraket:signin-email";
 
+/**
+ * Remembering the address between sending a magic link and following it.
+ *
+ * Wrapped, because localStorage is not always there to be written to: a
+ * private window, storage switched off, an embedded browser. Elsewhere
+ * in the app that only costs a badge (lib/chatRead.ts) or a first-paint
+ * guess (lib/authHint.ts). Here it was the difference between a sign-in
+ * page and a blank one — the read below happens inside an effect, so an
+ * exception took the whole page down, on the one page a locked-out
+ * player has to be able to use.
+ *
+ * Without storage the flow still works: the link asks for the address
+ * instead of remembering it, which is exactly what the prompt is for.
+ */
+function remembered(): string | null {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function remember(address: string): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, address);
+  } catch {
+    // The link still arrives; following it will ask for the address.
+  }
+}
+
+function forget(): void {
+  try {
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing was stored in the first place.
+  }
+}
+
 export default function LoginPage() {
   const { user, loading, configured } = useAuth();
   const router = useRouter();
@@ -28,14 +66,13 @@ export default function LoginPage() {
     const auth = firebaseAuth();
     if (!isSignInWithEmailLink(auth, window.location.href)) return;
 
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    const address = stored ?? window.prompt("Confirm the email address you used") ?? "";
+    const address = remembered() ?? window.prompt("Confirm the email address you used") ?? "";
     if (!address) return;
 
     setBusy(true);
     signInWithEmailLink(auth, address, window.location.href)
       .then(() => {
-        window.localStorage.removeItem(STORAGE_KEY);
+        forget();
         router.replace("/");
       })
       .catch((err: Error) => setError(err.message))
@@ -56,7 +93,10 @@ export default function LoginPage() {
         url: `${window.location.origin}/login`,
         handleCodeInApp: true,
       });
-      window.localStorage.setItem(STORAGE_KEY, email.trim());
+      // After the send, and separately from it: a storage failure must
+      // not be reported as "could not send the link" when the link is
+      // already on its way.
+      remember(email.trim());
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the link.");

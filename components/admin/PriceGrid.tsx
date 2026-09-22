@@ -191,7 +191,15 @@ export function PriceGrid({
           className="quiet small"
           onClick={() => {
             const list = rows.map((r) => r.symbol).join("\n");
-            navigator.clipboard?.writeText(list).catch(() => setBulkText(list));
+            // The optional chain short-circuits the .catch() with it, so
+            // a browser with no clipboard API — an insecure origin is
+            // enough — used to make this button do nothing at all rather
+            // than fall back. Putting the list in the box is the
+            // fallback; it is selectable, which is all the button was
+            // ever for.
+            const copied = navigator.clipboard?.writeText(list);
+            if (copied) copied.catch(() => setBulkText(list));
+            else setBulkText(list);
           }}
         >
           Copy tickers

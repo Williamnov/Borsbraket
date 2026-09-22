@@ -86,6 +86,12 @@ because each one failed in a way that looked like success:
   public alias, refuses to grade a page it was redirected away from, and skips preview deployments,
   which have no URL it can reach.
 
+- **The login page crashed without localStorage.** It read the remembered address inside an effect
+  with no guard, so a private window — where the getter throws rather than returning null — took the
+  whole page down, on the one page a locked-out player has to be able to use. Every other storage
+  access in the app was already wrapped; this one was missed. It now falls back to the prompt, which
+  is what the prompt was there for.
+
 ## Things worth not re-litigating
 
 - Firebase, not Supabase. An earlier Supabase implementation was removed.
