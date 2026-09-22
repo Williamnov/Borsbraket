@@ -30,9 +30,16 @@ because each one failed in a way that looked like success:
 
 1. **`npm run seed`** — 178 companies across eight new markets (Xetra, Paris, SIX, Amsterdam,
    Madrid, Milan, Tokyo, Sydney) are in the code but not in Firestore.
-2. **Three GitHub repository secrets** to switch the price feed on: `SITE_URL`, `CRON_SECRET` (the
-   same value as Vercel's) and `TWELVEDATA_API_KEY`. Until they exist the workflow exits green and
-   says so.
+2. **Two GitHub repository secrets** to switch the price feed on: `SITE_URL` and `CRON_SECRET` (the
+   same value as Vercel's). Until they exist the workflow exits green and says so. The price source
+   needs no key — see the Twelve Data note below for why it is no longer three secrets.
+
+   Then **run the Prices workflow by hand once** from the Actions tab and read the log. The one
+   thing that could not be tested from a laptop is whether a GitHub runner's shared address is
+   already in Yahoo's bad books. A clean run prints a price per symbol; a throttled one prints
+   `HTTP 429` and stops on the first batch, on purpose. If it is throttled, nothing is broken —
+   prices go in by hand from the admin grid, as they do today — but the feed needs a different
+   source and that is worth knowing before a month is riding on it.
 3. **Turn the CSP to enforcing.** Sign in, post a message, upload a photo, then check the Vercel
    logs for `[csp]` lines. If clean, set `CSP_ENFORCE=1`.
 4. **App Check**, if you want it: set `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`, watch the console's
@@ -44,7 +51,9 @@ because each one failed in a way that looked like success:
 - **Cloud Storage for profile pictures is not available.** The project is on the Spark plan and
   Firebase now requires a billing account to provision a bucket. Pictures are therefore data URLs on
   the profile document, written at 192px, which every reader of the league table downloads. Upgrading
-  to Blaze is what unblocks it — and would also lift the daily read cap.
+  to Blaze is what unblocks it — and would also lift the daily read cap. In practice this is cheaper
+  than it sounds: a 192px JPEG lands around 10 KB, so the 200 KB ceiling in the rules is a guard
+  rail and not the going rate, and the whole league's pictures are a few hundred kilobytes.
 - **Mid Cap, Small Cap and the Nordic growth lists are still seeded empty**, and market caps are all
   null. Segment membership reshuffles annually, so a seeded guess would put wrong names in front of
   players. Needs a current constituent list from somewhere trustworthy, or admin-panel entry.
@@ -58,6 +67,11 @@ because each one failed in a way that looked like success:
 - **`useRoundBundles` still recomputes settled months** on the league, history and profile pages.
   They now read cache-first, which is most of the cost, but a per-round summary document written
   once at settle time would collapse it properly. Fine at six months; noticeable at three seasons.
+- **The universe is 403 instruments now, not the ~300 it was** when the quota blew up. It is still
+  the largest single read in a cold visit, and `/history` pulls all of it just to put names against
+  tickers. A settled month's summary document would take that page off the universe entirely.
+- **`priceRuns` is written and never read.** The rules give it to admins and no page touches it, so
+  "one row per cron run, so a missed week is visible" is true only in the Firebase console.
 - **Tests cover the rules and the scoring.** `tests/rules` exercises the picks seal, the chat rate
   limit, the profile/contacts split and the legacy-handle path; `tests/unit` covers compounding,
   equal weighting, the sort tie-breaks and the checkpoint model. There is no test of the pages or
@@ -77,7 +91,15 @@ because each one failed in a way that looked like success:
   refused by the rules, deliberately.
 - The CSP carries no nonce, and that is not an oversight. See the note at the top of
   [`middleware.ts`](middleware.ts) before adding one back.
-- Prices are fetched from GitHub Actions rather than a Vercel cron, because of a rate limit that
-  needs four minutes and a function that dies at sixty seconds.
-- Stooq is not a usable free price source. It gates every endpoint behind a JavaScript
+- Prices are fetched from GitHub Actions rather than a Vercel cron, because a failed workflow emails
+  you and a Vercel cron that stops running tells nobody.
+- **Twelve Data cannot price this league.** Its free tier is US equities, forex and crypto; every
+  international exchange starts at a paid plan. The same demo key that prices `AAPL` returns a 401
+  for `ERIC.B` on `XSTO`. The README claimed the opposite for a while. Nothing was scored on it —
+  the secrets were never set, so the workflow had been exiting green without making a call.
+- Stooq is not a usable free price source either. It gates every endpoint behind a JavaScript
   proof-of-work challenge.
+- **Yahoo throttles by address**, and hard. Twenty-two symbols at a seventh of a second apart got
+  all but one of them a 429, from a domestic connection — a shared runner IP will be worse. That is
+  why the fetcher batches through `spark` at twenty symbols a request: a month's whole universe is
+  three or four calls a day. Do not "simplify" it back to one request per symbol.

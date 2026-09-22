@@ -109,28 +109,54 @@ portfolio as partly priced until they arrive.
 
 ## Prices
 
-Prices come from [Twelve Data](https://twelvedata.com), whose free tier covers every market in the
-universe above — all five Nordic exchanges included, which is the part most free feeds do not.
+Prices come from Yahoo's chart and spark endpoints, which cover every market in the universe above
+— all five Nordic exchanges included, which is the part most free feeds do not. No key and no plan.
 
-**The job runs in GitHub Actions, not on Vercel.** Twelve Data's free tier allows eight symbols a
-minute and each symbol costs one credit, so thirty instruments take about four minutes of paced
-requests, and a Vercel Hobby function is killed at sixty seconds. Running it in Actions also
-sidesteps Hobby's daily-only cron schedules, sends an email when a run fails — which is the alert a
-job whose failure mode is silence badly needs — and keeps the Twelve Data key in GitHub while the
-Firebase key stays in Vercel, so neither service holds both.
+**Twelve Data was the first choice and could not do it.** Its free tier covers US equities, forex
+and crypto; every international exchange, which is to say every Nordic list and the whole premise of
+this league, starts at a paid plan. The same demo key that prices `AAPL` returns a 401 for `ERIC.B`
+on `XSTO`. Nothing was ever scored on it — the secrets were never set, so the workflow had been
+exiting green without making a single call.
 
-Set three repository secrets to switch it on: `SITE_URL`, `CRON_SECRET` (the same value as Vercel's)
-and `TWELVEDATA_API_KEY`. Until they exist the workflow exits green and says so, and prices are
-typed into the admin panel as before.
+What Yahoo costs instead is a guarantee. It is an undocumented endpoint that can change shape
+without warning and has nobody to ask. Three things make that survivable: a failed run emails you, a
+missed checkpoint is reported rather than backfilled with a wrong number, and the admin grid takes
+prices by hand at any time.
+
+**The job runs in GitHub Actions, not on Vercel**, for the alert. A failed workflow emails you,
+which is what a job whose failure mode is silence badly needs; a Vercel cron that stops running
+tells nobody. It also keeps the Firebase key in Vercel and nothing sensitive in GitHub.
+
+Yahoo throttles by address, and a GitHub runner is a shared datacentre IP that plenty of other
+people are also pointing at Yahoo. So the fetcher batches: `spark` takes twenty symbols per request,
+which turns a month's whole universe into three or four calls a day rather than seventy. Anything a
+batch could not price is then asked for one at a time through `chart`, which also reports the
+currency — the one cross-check available, since a document whose currency disagrees with its
+exchange is a seeding mistake worth catching.
+
+Set two repository secrets to switch it on: `SITE_URL` and `CRON_SECRET` (the same value as
+Vercel's). Until they exist the workflow exits green and says so, and prices are typed into the
+admin panel as before.
+
+Then run the workflow by hand once and read the log, because there is one thing a laptop cannot
+test: whether a runner's shared address is already throttled. A clean run prints a price per symbol.
+A throttled one prints `HTTP 429` and stops on the first batch rather than retrying seventy times,
+which is deliberate — being refused is about the address, not the symbol, and hammering it is how a
+soft limit becomes a hard one.
 
 The split keeps the decisions in one place. `GET /api/cron/weekly-prices?plan=1` says what is
 needed, `POST` takes prices someone else fetched, and the script in
 [`scripts/fetch-prices.mjs`](scripts/fetch-prices.mjs) is deliberately ignorant: it is handed symbols
-with their exchange codes and hands back numbers. Which checkpoint a price belongs to, and whether it
+with their market codes and hands back numbers. Which checkpoint a price belongs to, and whether it
 may be written at all, is decided by the route — and a quote for something the run did not ask for is
 dropped, so a replayed request cannot rewrite a checkpoint that is already final.
 
-Stooq was the obvious free alternative and is not usable: it now gates every endpoint behind a
+Translating a market code into whatever a particular feed calls that exchange lives in the fetcher,
+beside the feed, because each one spells it differently: Twelve Data wanted an ISO 10383 MIC, Yahoo
+wants a suffix on the ticker. What the app hands out is the market code, which is its own fact rather
+than any vendor's.
+
+Stooq was the other obvious free alternative and is not usable: it now gates every endpoint behind a
 JavaScript proof-of-work challenge.
 
 ## Data model

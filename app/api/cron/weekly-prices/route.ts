@@ -3,7 +3,6 @@ import { adminDb } from "@/lib/firebase/admin";
 import { serverEnv } from "@/lib/env";
 import { getPriceProvider } from "@/lib/prices";
 import { checkpointDueDates, currentCheckpoint, isPricingOpen } from "@/lib/scoring";
-import { MARKET_MIC } from "@/lib/universe";
 import { SYSTEM_UID, toDate, type Round } from "@/lib/types";
 import { monthLabel } from "@/lib/format";
 import type { PriceRequest, Quote } from "@/lib/prices/types";
@@ -39,13 +38,14 @@ const WEEK_FIELDS = ["w0", "w1", "w2", "w3", "w4"] as const;
  * POST {quotes} writes prices somebody else fetched.
  * GET          fetches through PRICE_PROVIDER and writes, in one go.
  *
- * The split exists because of a rate limit. Twelve Data's free tier
- * allows eight symbols a minute, so thirty instruments take about four
- * minutes — and a Vercel Hobby function is killed at sixty seconds. The
- * fetching therefore happens in a GitHub Action, which has hours, while
- * every decision about *what* a price means stays here. The Action is
- * deliberately ignorant: it is handed a list of symbols with their
- * exchange codes and hands back numbers.
+ * The split exists for the alert. A failed GitHub Action emails you,
+ * which is what a job whose failure mode is silence badly needs; a
+ * Vercel cron that stops running tells nobody. So the fetching happens
+ * in an Action while every decision about *what* a price means stays
+ * here. The Action is deliberately ignorant: it is handed a list of
+ * symbols with their market codes and hands back numbers. Translating a
+ * market code into whatever a particular feed calls that exchange is its
+ * business, not this route's.
  *
  * All three need the CRON_SECRET.
  */
@@ -71,7 +71,7 @@ type RoundPlan = {
   field: string;
   dueAt: string | null;
   /** Instruments with no value at this checkpoint yet. */
-  requests: (PriceRequest & { mic: string })[];
+  requests: PriceRequest[];
   /** Earlier checkpoints that were never recorded, for the admin to fill. */
   gaps: string[];
 };
@@ -120,7 +120,7 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
       pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]),
     );
     const field = WEEK_FIELDS[checkpoint];
-    const requests: (PriceRequest & { mic: string })[] = [];
+    const requests: PriceRequest[] = [];
     const gaps: string[] = [];
 
     for (const id of wanted) {
@@ -139,14 +139,16 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
 
       if (typeof current?.[field] === "number") continue;
 
-      const marketCode = instrument.marketCode ?? "";
       requests.push({
         instrumentId: id,
         symbol: instrument.symbol,
-        marketCode,
+        // The market, so a feed can name the exchange and tell Sanofi
+        // from Banco Santander. Translating it into whatever a
+        // particular vendor calls that exchange is the fetcher's job.
+        marketCode: instrument.marketCode ?? "",
+        // Checked against what the feed reports, so a symbol that
+        // resolves on the wrong exchange is dropped rather than scored.
         currency: instrument.currency ?? "",
-        // The exchange, so a feed can tell Sanofi from Banco Santander.
-        mic: MARKET_MIC[marketCode] ?? "",
       });
     }
 

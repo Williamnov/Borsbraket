@@ -2,12 +2,11 @@ name: Prices
 
 # The weekly checkpoint.
 #
-# This is not a Vercel cron for a concrete reason: Twelve Data's free
-# tier allows eight symbols a minute, so thirty instruments take about
-# four minutes of paced requests and a Vercel Hobby function is killed at
-# sixty seconds. It also sidesteps Hobby's daily-only cron schedules, and
-# a failed workflow emails you — which is the alert a job whose failure
-# mode is silence has been missing.
+# This is not a Vercel cron, for the alert. A failed workflow emails
+# you, which is what a job whose failure mode is silence has been
+# missing; a Vercel cron that stops running tells nobody. It also
+# sidesteps Hobby's daily-only cron schedules, should this ever want a
+# different clock.
 #
 # Daily rather than weekly, because what gets recorded is decided by the
 # round's own clock: the baseline is the price at the lock, and the lock
@@ -16,8 +15,8 @@ name: Prices
 # nothing extra — it just means the baseline lands within a day of the
 # lock instead of drifting to the next Monday.
 #
-# Needs three secrets: SITE_URL, CRON_SECRET (matching Vercel's) and
-# TWELVEDATA_API_KEY.
+# Needs two secrets: SITE_URL and CRON_SECRET (matching Vercel's). The
+# price source needs no key.
 
 on:
   schedule:
@@ -35,9 +34,10 @@ jobs:
   fetch:
     name: Fetch and record
     runs-on: ubuntu-latest
-    # Generous: the pacing is deliberate, not a hang. Four minutes for
-    # thirty symbols, plus room for a month where everyone picks widely.
-    timeout-minutes: 30
+    # Generous. One request per symbol with a short pause between them
+    # is seconds, not minutes, but a retry against a throttled feed can
+    # stretch it and a hung run should end by itself.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -51,4 +51,3 @@ jobs:
         env:
           SITE_URL: ${{ secrets.SITE_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}

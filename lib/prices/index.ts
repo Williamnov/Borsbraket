@@ -35,6 +35,14 @@ const manualProvider: PriceProvider = {
  *
  * Map the vendor's symbology to `symbol` + `marketCode`; most feeds want
  * an exchange-qualified ticker such as "ERIC-B.ST" or "AAPL.US".
+ *
+ * One thing to know before doing step 3. Whatever is implemented here
+ * runs inside the daily Vercel cron, and a Hobby function is killed at
+ * sixty seconds — so a feed that needs paced requests belongs in
+ * scripts/fetch-prices.mjs, where the GitHub Action has as long as it
+ * likes, and not here. `manual` stays the default for that reason: the
+ * cron then only announces and records the run, both of which are
+ * instant.
  */
 const httpProvider: PriceProvider = {
   name: "http",

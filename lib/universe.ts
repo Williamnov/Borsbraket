@@ -77,46 +77,15 @@ export const MARKETS: MarketSeed[] = [
   { code: "AU_ASX", name: "Australian Securities Exchange", country: "Australia", region: "Asia-Pacific", currency: "AUD", sortOrder: 111 },
 ];
 
-/**
- * The ISO 10383 code for each market's trading venue.
- *
- * Price feeds want to know which exchange a ticker belongs to — "SAN" is
- * Sanofi in Paris and Banco Santander in Madrid, and there is no way to
- * tell them apart from the symbol alone. Kept here beside the markets
- * rather than in the provider, because it is a fact about the exchange
- * and not about any particular vendor.
- *
- * Markets with no entry can still be picked; they simply have to be
- * priced by hand.
+/*
+ * A MARKET_MIC table used to live here, mapping each market to its ISO
+ * 10383 venue code. It existed for one caller — Twelve Data's `mic_code`
+ * parameter — and went with it. Naming the exchange is still necessary
+ * ("SAN" is Sanofi in Paris and Banco Santander in Madrid), but each
+ * feed spells that its own way, so the translation now sits beside the
+ * feed in scripts/fetch-prices.mjs. What the app hands out is the
+ * market code, which is its own fact rather than any vendor's.
  */
-export const MARKET_MIC: Record<string, string> = {
-  SE_LARGE: "XSTO",
-  SE_MID: "XSTO",
-  SE_SMALL: "XSTO",
-  FI_LARGE: "XHEL",
-  FI_MID: "XHEL",
-  FI_SMALL: "XHEL",
-  DK_LARGE: "XCSE",
-  DK_MID: "XCSE",
-  DK_SMALL: "XCSE",
-  NO_OSE: "XOSL",
-  IS_LARGE: "XICE",
-  IS_MID: "XICE",
-  IS_SMALL: "XICE",
-  US_NYSE: "XNYS",
-  US_NASDAQ: "XNAS",
-  US_AMEX: "XASE",
-  CA_TSX: "XTSE",
-  UK_LSE: "XLON",
-  DE_XETRA: "XETR",
-  FR_EPA: "XPAR",
-  CH_SIX: "XSWX",
-  NL_AMS: "XAMS",
-  ES_BME: "XMAD",
-  IT_MIL: "XMIL",
-  JP_TSE: "XJPX",
-  AU_ASX: "XASX",
-};
 
 function list(marketCode: string, currency: string, rows: [string, string][]): InstrumentSeed[] {
   return rows.map(([symbol, name]) => ({ symbol, name, marketCode, currency }));
