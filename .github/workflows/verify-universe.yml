@@ -1,0 +1,83 @@
+name: Verify universe
+
+# Can the price feed actually price what is in lib/universe.instruments?
+#
+# The universe is generated from each exchange's own lists, which makes
+# it right about what is listed and says nothing about what Yahoo knows.
+# Those are different questions and only this one matters on the Monday
+# somebody's pick needs a number.
+#
+# Not on a schedule. The money is not the issue — the feed needs no key,
+# and the runner minutes are free on a public repository — but the
+# weekly price job depends on these same runner addresses staying in the
+# feed's good books, and that is the budget worth protecting. A list
+# that only changes when somebody changes it does not need checking on a
+# clock. Run it by hand after editing the universe, and read the log.
+#
+# The default pass batches twenty symbols per request and only looks
+# closely at what that could not resolve, plus a sample of each market:
+# roughly a quarter of an hour rather than two hours. `deep` checks
+# every symbol individually and is worth doing about once.
+#
+# It needs no secrets. Nothing here talks to the app.
+
+on:
+  workflow_dispatch:
+    inputs:
+      market:
+        description: "One market code, e.g. SE_FN. Blank checks everything."
+        required: false
+        default: ""
+      limit:
+        description: "Stop after this many instruments. Blank checks all of them."
+        required: false
+        default: ""
+      deep:
+        description: "Check every symbol individually rather than sampling. Slow."
+        type: boolean
+        required: false
+        default: false
+
+# Sharing an address with the weekly price job is the whole risk here, so
+# do not run two of these at once either.
+concurrency:
+  group: yahoo
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Check every symbol against the feed
+    runs-on: ubuntu-latest
+    # The default pass is about a quarter of an hour. `deep` paces three
+    # and a half thousand instruments at two seconds each, which is a bit
+    # over two hours — that is the job, not a hang.
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Unlike the price job this one does install, because it reads the
+      # universe straight out of the TypeScript rather than being handed
+      # a list of symbols by the app.
+      - run: npm ci
+
+      - name: Verify
+        run: |
+          npx tsx scripts/verify-universe.ts \
+            ${{ inputs.market && format('--market {0}', inputs.market) || '' }} \
+            ${{ inputs.limit && format('--limit {0}', inputs.limit) || '' }} \
+            ${{ inputs.deep && '--deep' || '' }}
+
+      # The log truncates and the report does not. Keep it either way:
+      # the run is red precisely when the detail is worth having.
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universe-report
+          path: universe-report.json
+          if-no-files-found: ignore

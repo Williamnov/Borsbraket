@@ -17,9 +17,10 @@ anything.
   not at the start of the month. Measuring from the 1st would hand whoever submits last three
   days of hindsight; sealing and measuring at the same instant gives everyone one starting price.
 - **Points**: 10 / 7 / 5 / 4 / 3 / 2, then 1 for everyone else who submitted.
-- **Eligible markets**: every Nordic list (Sweden, Finland, Denmark, Norway, Iceland), the main
-  North American and UK markets, the large continental European venues (Xetra, Paris, SIX,
-  Amsterdam, Madrid, Milan) and Tokyo and Sydney.
+- **Eligible markets**: 30 of them, holding 3,584 instruments — every Nordic list from Large Cap
+  down to First North (Sweden, Finland, Denmark, Norway, Iceland), the main North American and UK
+  markets, the large continental European venues (Xetra, Paris, SIX, Amsterdam, Madrid, Milan) and
+  Tokyo and Sydney. Any of them can be closed from the admin panel.
 - **No penny stocks.** Only instruments an admin has marked eligible can be picked, and that is
   checked when picks are saved. The filter is company size, not share price.
 
@@ -68,8 +69,13 @@ npm install
 npm run seed
 ```
 
-That writes the markets, the starting instrument list and the league settings. Then start the app,
-sign in once so your account exists, and promote it:
+That writes the 30 markets, the 3,584 instruments and the league settings. Every write is a merge on
+a stable document id, so it is safe to run again — but note that it only ever adds and updates.
+Nothing in it deletes, so an instrument that has left the exchange, or moved between the Large and
+Mid Cap segments, keeps its old document and stays pickable until someone marks it ineligible in the
+admin panel.
+
+Then start the app, sign in once so your account exists, and promote it:
 
 ```bash
 npm run dev
@@ -150,6 +156,41 @@ needed, `POST` takes prices someone else fetched, and the script in
 with their market codes and hands back numbers. Which checkpoint a price belongs to, and whether it
 may be written at all, is decided by the route — and a quote for something the run did not ask for is
 dropped, so a replayed request cannot rewrite a checkpoint that is already final.
+
+The plan asks for what is held, not for everything. It reads the month's picks, queries the two
+benchmarks, and fetches those instruments by id — it does **not** read the instruments collection.
+At four hundred names that distinction was academic; at three and a half thousand it is a few
+thousand reads a day, every day, against a fifty thousand read quota this project has already
+exhausted once.
+
+## The universe
+
+Nothing in [`lib/universe.instruments.ts`](lib/universe.instruments.ts) is typed out by hand. Each
+market is generated from a source that is accountable for the list: Nasdaq's own Nordic screener
+(which is where the Large, Mid, Small and First North segments come from — the exchange's
+classification, not a guess at it), Nasdaq's US screener with its market caps, JPX's listed-company
+master with its TOPIX size classes, and index constituent tables for the rest.
+
+That makes it right about what is listed and says nothing about what the price feed calls it, which
+is the part that matters on the Monday somebody's pick needs a number. A name nobody can price is
+worse than a name nobody can pick: it looks fine in the pick editor, it looks fine at submission,
+and it becomes a gap halfway through a month.
+
+So [`scripts/verify-universe.ts`](scripts/verify-universe.ts) asks the feed about every symbol,
+using the same mapping the fetcher uses — from the same module, [`scripts/yahoo-symbol.mjs`](scripts/yahoo-symbol.mjs),
+because a second copy of that mapping would have had the checker answering the question about
+itself. Run it from the **Verify universe** workflow in the Actions tab after changing the universe.
+It needs no secrets and takes about a quarter of an hour.
+
+It costs nothing in money — the feed needs no key and the runner minutes are free on a public
+repository — but it does spend the goodwill of an address the weekly price job depends on. Hence the
+shape: twenty symbols per request for the whole universe, then a closer look only at what that could
+not resolve, plus a sample of each market to catch a suffix aimed at the wrong exchange. `--deep`
+checks all of them individually and takes two hours.
+
+Seven markets are deliberately empty — Spotlight, NGM, NGM PepMarket, Nordic SME, Spotlight Denmark
+and the two Euronext Growth/Expand lists in Oslo. None of those venues publishes a list this could
+read. Add those names from the admin panel; the markets exist so they have somewhere to go.
 
 Translating a market code into whatever a particular feed calls that exchange lives in the fetcher,
 beside the feed, because each one spells it differently: Twelve Data wanted an ISO 10383 MIC, Yahoo
@@ -235,7 +276,12 @@ npm run seed        # markets, instruments, settings
 npm test            # the scoring functions — no emulator, no network
 npm run test:rules  # firestore.rules against the emulator
 npm run smoke       # check a deployed URL actually renders
+npm run verify      # ask the price feed about every instrument
 ```
+
+`verify` talks to a feed that throttles by address and that the weekly price job also depends on, so
+prefer running it from the **Verify universe** workflow rather than from a laptop sharing an office
+address. `npm run verify -- --market SE_FN` checks one market.
 
 ### The rules tests
 

@@ -1,16 +1,17 @@
 /**
- * The pickable universe.
+ * The pickable universe: the markets, and how an instrument is named.
  *
  * MARKETS covers every Nordic list, the main North American and UK
  * exchanges, the large continental European venues and Tokyo and Sydney.
  * Disable a market in the admin panel to close it.
  *
- * INSTRUMENTS seeds established companies only, and only where the
- * listing is unambiguous. The Nordic growth lists (First North,
- * Spotlight, NGM, Nordic SME) and the Mid/Small Cap segments are seeded
- * EMPTY on purpose: segment membership is reshuffled every year, so
- * rather than guess, add those names from the admin panel. Nothing can
- * be picked that is not in this collection.
+ * The instruments themselves are in ./universe.instruments — three and a
+ * half thousand rows, generated from each exchange's own lists rather
+ * than typed out, which is also why the Mid and Small Cap segments are
+ * no longer empty. See that file for where every market's names came
+ * from and which venues still have none.
+ *
+ * Nothing can be picked that is not in that collection.
  */
 
 export type MarketSeed = {
@@ -86,222 +87,6 @@ export const MARKETS: MarketSeed[] = [
  * feed in scripts/fetch-prices.mjs. What the app hands out is the
  * market code, which is its own fact rather than any vendor's.
  */
-
-function list(marketCode: string, currency: string, rows: [string, string][]): InstrumentSeed[] {
-  return rows.map(([symbol, name]) => ({ symbol, name, marketCode, currency }));
-}
-
-export const INSTRUMENTS: InstrumentSeed[] = [
-  ...list("SE_LARGE", "SEK", [
-    ["ABB", "ABB"], ["AAK", "AAK"], ["ADDT B", "Addtech B"], ["ALFA", "Alfa Laval"],
-    ["ASSA B", "Assa Abloy B"], ["ATCO A", "Atlas Copco A"], ["ATCO B", "Atlas Copco B"],
-    ["AXFO", "Axfood"], ["AZN", "AstraZeneca"], ["BEIJ B", "Beijer Ref B"], ["BOL", "Boliden"],
-    ["CAST", "Castellum"], ["DOM", "Dometic Group"], ["ELUX B", "Electrolux B"],
-    ["EPI A", "Epiroc A"], ["EPI B", "Epiroc B"], ["EQT", "EQT"], ["ERIC B", "Ericsson B"],
-    ["ESSITY B", "Essity B"], ["EVO", "Evolution"], ["FABG", "Fabege"], ["GETI B", "Getinge B"],
-    ["HEXA B", "Hexagon B"], ["HM B", "H&M B"], ["HOLM B", "Holmen B"], ["HUSQ B", "Husqvarna B"],
-    ["INDT", "Indutrade"], ["INDU C", "Industrivärden C"], ["INVE B", "Investor B"],
-    ["KINV B", "Kinnevik B"], ["LATO B", "Investment AB Latour B"], ["LIFCO B", "Lifco B"],
-    ["LOOMIS", "Loomis"], ["NCC B", "NCC B"], ["NDA SE", "Nordea Bank"],
-    ["NIBE B", "Nibe Industrier B"], ["PEAB B", "Peab B"], ["SAAB B", "Saab B"],
-    ["SAGA B", "Sagax B"], ["SAND", "Sandvik"], ["SCA B", "SCA B"], ["SEB A", "SEB A"],
-    ["SECU B", "Securitas B"], ["SHB A", "Handelsbanken A"], ["SKA B", "Skanska B"],
-    ["SKF B", "SKF B"], ["SOBI", "Swedish Orphan Biovitrum"], ["SSAB B", "SSAB B"],
-    ["SWEC B", "Sweco B"], ["SWED A", "Swedbank A"], ["TEL2 B", "Tele2 B"],
-    ["TELIA", "Telia Company"], ["THULE", "Thule Group"], ["TREL B", "Trelleborg B"],
-    ["VOLCAR B", "Volvo Car B"], ["VOLV B", "Volvo B"],
-  ]),
-
-  ...list("FI_LARGE", "EUR", [
-    ["ELISA", "Elisa"], ["FORTUM", "Fortum"], ["KESKOB", "Kesko B"], ["KNEBV", "Kone B"],
-    ["METSO", "Metso"], ["NESTE", "Neste"], ["NOKIA", "Nokia"], ["ORNBV", "Orion B"],
-    ["SAMPO", "Sampo A"], ["STERV", "Stora Enso R"], ["TYRES", "Nokian Tyres"],
-    ["UPM", "UPM-Kymmene"], ["WRT1V", "Wärtsilä B"],
-  ]),
-
-  ...list("DK_LARGE", "DKK", [
-    ["AMBU B", "Ambu B"], ["CARL B", "Carlsberg B"], ["COLO B", "Coloplast B"],
-    ["DEMANT", "Demant"], ["DSV", "DSV"], ["GMAB", "Genmab"],
-    ["MAERSK B", "A.P. Møller-Mærsk B"], ["NOVO B", "Novo Nordisk B"], ["NSIS B", "Novonesis B"],
-    ["ORSTED", "Ørsted"], ["PNDORA", "Pandora"], ["RBREW", "Royal Unibrew"], ["TRYG", "Tryg"],
-    ["VWS", "Vestas Wind Systems"],
-  ]),
-
-  ...list("NO_OSE", "NOK", [
-    ["AKER", "Aker"], ["AKRBP", "Aker BP"], ["DNB", "DNB Bank"], ["EQNR", "Equinor"],
-    ["FRO", "Frontline"], ["GJF", "Gjensidige Forsikring"], ["KOG", "Kongsberg Gruppen"],
-    ["MOWI", "Mowi"], ["NHY", "Norsk Hydro"], ["ORK", "Orkla"], ["SALM", "SalMar"],
-    ["SCHA", "Schibsted A"], ["STB", "Storebrand"], ["SUBC", "Subsea 7"], ["TEL", "Telenor"],
-    ["TOM", "Tomra Systems"], ["YAR", "Yara International"],
-  ]),
-
-  ...list("IS_LARGE", "ISK", [
-    ["ARION", "Arion banki"], ["BRIM", "Brim"], ["EIM", "Eimskip"], ["FESTI", "Festi"],
-    ["HAGA", "Hagar"], ["ICEAIR", "Icelandair Group"], ["KVIKA", "Kvika banki"],
-    ["SIMINN", "Síminn"], ["SJOVA", "Sjóvá-Almennar"],
-  ]),
-
-  ...list("US_NYSE", "USD", [
-    ["ABBV", "AbbVie"], ["ABT", "Abbott Laboratories"], ["ACN", "Accenture"],
-    ["AXP", "American Express"], ["BA", "Boeing"], ["BAC", "Bank of America"],
-    ["BLK", "BlackRock"], ["BRK.B", "Berkshire Hathaway B"], ["C", "Citigroup"],
-    ["CAT", "Caterpillar"], ["CRM", "Salesforce"], ["CVS", "CVS Health"], ["CVX", "Chevron"],
-    ["DE", "Deere & Company"], ["DHR", "Danaher"], ["DIS", "Walt Disney"],
-    ["ELV", "Elevance Health"], ["GE", "GE Aerospace"], ["GS", "Goldman Sachs"],
-    ["HD", "Home Depot"], ["IBM", "IBM"], ["JNJ", "Johnson & Johnson"],
-    ["JPM", "JPMorgan Chase"], ["KO", "Coca-Cola"], ["LLY", "Eli Lilly"],
-    ["LOW", "Lowe's"], ["MA", "Mastercard"], ["MCD", "McDonald's"], ["MMM", "3M"],
-    ["MRK", "Merck & Co."], ["MS", "Morgan Stanley"], ["NKE", "Nike B"],
-    ["NOW", "ServiceNow"], ["NVO", "Novo Nordisk ADR"], ["PG", "Procter & Gamble"],
-    ["PM", "Philip Morris International"], ["RTX", "RTX Corporation"],
-    ["SCHW", "Charles Schwab"], ["SHOP", "Shopify A"], ["SPGI", "S&P Global"],
-    ["SPOT", "Spotify Technology"], ["T", "AT&T"], ["TMO", "Thermo Fisher Scientific"],
-    ["TSM", "Taiwan Semiconductor ADR"], ["UBER", "Uber Technologies"],
-    ["UNH", "UnitedHealth Group"], ["UPS", "United Parcel Service B"], ["V", "Visa A"],
-    ["VZ", "Verizon Communications"], ["WFC", "Wells Fargo"], ["WMT", "Walmart"],
-    ["XOM", "Exxon Mobil"],
-  ]),
-
-  ...list("US_NASDAQ", "USD", [
-    ["AAPL", "Apple"], ["ADBE", "Adobe"], ["ADP", "Automatic Data Processing"],
-    ["ADSK", "Autodesk"], ["AMAT", "Applied Materials"], ["AMD", "Advanced Micro Devices"],
-    ["AMGN", "Amgen"], ["AMZN", "Amazon.com"], ["ASML", "ASML Holding ADR"],
-    ["AVGO", "Broadcom"], ["BKNG", "Booking Holdings"], ["CDNS", "Cadence Design Systems"],
-    ["COIN", "Coinbase Global A"], ["COST", "Costco Wholesale"], ["CRWD", "CrowdStrike A"],
-    ["CSCO", "Cisco Systems"], ["CTAS", "Cintas"], ["DDOG", "Datadog A"],
-    ["EA", "Electronic Arts"], ["FTNT", "Fortinet"], ["GILD", "Gilead Sciences"],
-    ["GOOGL", "Alphabet A"], ["HON", "Honeywell International"], ["INTC", "Intel"],
-    ["INTU", "Intuit"], ["ISRG", "Intuitive Surgical"], ["KLAC", "KLA Corporation"],
-    ["LRCX", "Lam Research"], ["MDLZ", "Mondelez International A"], ["MELI", "MercadoLibre"],
-    ["META", "Meta Platforms A"], ["MNST", "Monster Beverage"], ["MRVL", "Marvell Technology"],
-    ["MSFT", "Microsoft"], ["MU", "Micron Technology"], ["NFLX", "Netflix"], ["NVDA", "NVIDIA"],
-    ["ODFL", "Old Dominion Freight Line"], ["ORLY", "O'Reilly Automotive"],
-    ["PANW", "Palo Alto Networks"], ["PCAR", "PACCAR"], ["PEP", "PepsiCo"],
-    ["PLTR", "Palantir Technologies A"], ["PYPL", "PayPal Holdings"], ["QCOM", "Qualcomm"],
-    ["REGN", "Regeneron Pharmaceuticals"], ["SBUX", "Starbucks"], ["SNPS", "Synopsys"],
-    ["TEAM", "Atlassian A"], ["TSLA", "Tesla"], ["TTWO", "Take-Two Interactive"],
-    ["TXN", "Texas Instruments"], ["VRTX", "Vertex Pharmaceuticals"], ["WDAY", "Workday A"],
-    ["ZS", "Zscaler"],
-  ]),
-
-  ...list("CA_TSX", "CAD", [
-    ["ABX", "Barrick Mining"], ["AEM", "Agnico Eagle Mines"], ["ATD", "Alimentation Couche-Tard"],
-    ["BCE", "BCE"], ["BMO", "Bank of Montreal"], ["BNS", "Bank of Nova Scotia"], ["CM", "CIBC"],
-    ["CNQ", "Canadian Natural Resources"], ["CNR", "Canadian National Railway"],
-    ["CP", "Canadian Pacific Kansas City"], ["CSU", "Constellation Software"],
-    ["CVE", "Cenovus Energy"], ["DOL", "Dollarama"], ["ENB", "Enbridge"], ["FTS", "Fortis"],
-    ["GWO", "Great-West Lifeco"], ["IMO", "Imperial Oil"], ["L", "Loblaw Companies"],
-    ["MFC", "Manulife Financial"], ["NA", "National Bank of Canada"], ["NTR", "Nutrien"],
-    ["OTEX", "Open Text"], ["POW", "Power Corporation of Canada"],
-    ["QSR", "Restaurant Brands International"], ["RY", "Royal Bank of Canada"],
-    ["SLF", "Sun Life Financial"], ["SU", "Suncor Energy"], ["TD", "Toronto-Dominion Bank"],
-    ["TRI", "Thomson Reuters"], ["TRP", "TC Energy"], ["WCN", "Waste Connections"],
-  ]),
-
-  // Several of these trade below GBP 1 and are still FTSE 100 companies.
-  // This league filters on company size, never on share price.
-  ...list("UK_LSE", "GBP", [
-    ["AAL", "Anglo American"], ["ADM", "Admiral Group"], ["ANTO", "Antofagasta"],
-    ["AV", "Aviva"], ["AZN", "AstraZeneca"], ["BA", "BAE Systems"], ["BARC", "Barclays"],
-    ["BATS", "British American Tobacco"], ["BP", "BP"], ["CPG", "Compass Group"],
-    ["DGE", "Diageo"], ["EXPN", "Experian"], ["FERG", "Ferguson Enterprises"],
-    ["GLEN", "Glencore"], ["GSK", "GSK"], ["HLMA", "Halma"], ["HSBA", "HSBC Holdings"],
-    ["IHG", "InterContinental Hotels"], ["III", "3i Group"], ["IMB", "Imperial Brands"],
-    ["ITRK", "Intertek Group"], ["LLOY", "Lloyds Banking Group"],
-    ["LSEG", "London Stock Exchange Group"], ["MNDI", "Mondi"], ["NG", "National Grid"],
-    ["NXT", "Next"], ["PRU", "Prudential"], ["PSON", "Pearson"], ["REL", "RELX"],
-    ["RIO", "Rio Tinto"], ["RKT", "Reckitt Benckiser Group"], ["SGE", "Sage Group"],
-    ["SHEL", "Shell"], ["SMIN", "Smiths Group"], ["SN", "Smith & Nephew"], ["SSE", "SSE"],
-    ["STAN", "Standard Chartered"], ["SVT", "Severn Trent"], ["TSCO", "Tesco"],
-    ["ULVR", "Unilever"], ["UU", "United Utilities Group"], ["VOD", "Vodafone Group"],
-    ["WPP", "WPP"], ["WTB", "Whitbread"],
-  ]),
-
-  // ── Continental Europe and Asia-Pacific ─────────────────────────────
-  // Every ticker below was checked against the price feed's catalogue
-  // before being added: a name nobody can price is worse than a name
-  // nobody can pick, because it fails silently halfway through a month.
-  // Companies that trade in two of these markets appear once, in their
-  // primary listing — Airbus in Paris, Stellantis in Paris.
-
-  ...list("DE_XETRA", "EUR", [
-    ["SAP", "SAP"], ["SIE", "Siemens"], ["ALV", "Allianz"], ["DTE", "Deutsche Telekom"],
-    ["MBG", "Mercedes-Benz Group"], ["BMW", "BMW"], ["BAS", "BASF"], ["BAYN", "Bayer"],
-    ["ADS", "Adidas"], ["MUV2", "Münchener Rück"], ["DBK", "Deutsche Bank"], ["RWE", "RWE"],
-    ["VOW3", "Volkswagen Pref"], ["IFX", "Infineon Technologies"], ["HEN3", "Henkel Pref"],
-    ["DHL", "DHL Group"], ["MRK", "Merck KGaA"], ["EOAN", "E.ON"], ["ZAL", "Zalando"],
-    ["P911", "Porsche AG"], ["SHL", "Siemens Healthineers"], ["VNA", "Vonovia"],
-    ["BEI", "Beiersdorf"], ["DB1", "Deutsche Börse"],
-  ]),
-
-  ...list("FR_EPA", "EUR", [
-    ["MC", "LVMH"], ["OR", "L'Oréal"], ["TTE", "TotalEnergies"], ["SAN", "Sanofi"],
-    ["AIR", "Airbus"], ["SU", "Schneider Electric"], ["BNP", "BNP Paribas"],
-    ["AI", "Air Liquide"], ["EL", "EssilorLuxottica"], ["DG", "Vinci"], ["CS", "AXA"],
-    ["RMS", "Hermès International"], ["KER", "Kering"], ["SGO", "Saint-Gobain"],
-    ["CAP", "Capgemini"], ["ACA", "Crédit Agricole"], ["VIE", "Veolia"], ["ORA", "Orange"],
-    ["STLAP", "Stellantis"], ["RI", "Pernod Ricard"], ["BN", "Danone"], ["ML", "Michelin"],
-    ["PUB", "Publicis Groupe"], ["LR", "Legrand"], ["ENGI", "Engie"],
-  ]),
-
-  ...list("CH_SIX", "CHF", [
-    ["NESN", "Nestlé"], ["NOVN", "Novartis"], ["RO", "Roche Holding"],
-    ["ZURN", "Zurich Insurance"], ["UBSG", "UBS Group"], ["ABBN", "ABB Ltd"],
-    ["CFR", "Richemont"], ["SIKA", "Sika"], ["LONN", "Lonza Group"], ["GIVN", "Givaudan"],
-    ["SGSN", "SGS"], ["HOLN", "Holcim"], ["SCMN", "Swisscom"], ["GEBN", "Geberit"],
-    ["SREN", "Swiss Re"], ["ALC", "Alcon"], ["PGHN", "Partners Group"],
-    ["BAER", "Julius Bär"], ["STMN", "Straumann"], ["KNIN", "Kühne+Nagel"],
-  ]),
-
-  ...list("NL_AMS", "EUR", [
-    ["ASML", "ASML Holding"], ["INGA", "ING Groep"], ["AD", "Ahold Delhaize"],
-    ["PHIA", "Philips"], ["HEIA", "Heineken"], ["WKL", "Wolters Kluwer"],
-    ["AKZA", "Akzo Nobel"], ["DSFIR", "DSM-Firmenich"], ["RAND", "Randstad"], ["KPN", "KPN"],
-    ["ASM", "ASM International"], ["BESI", "BE Semiconductor"], ["AGN", "Aegon"],
-    ["NN", "NN Group"], ["IMCD", "IMCD"], ["ADYEN", "Adyen"], ["PRX", "Prosus"],
-    ["UMG", "Universal Music Group"], ["ABN", "ABN AMRO"],
-  ]),
-
-  ...list("ES_BME", "EUR", [
-    ["ITX", "Inditex"], ["IBE", "Iberdrola"], ["SAN", "Banco Santander"], ["BBVA", "BBVA"],
-    ["AENA", "Aena"], ["TEF", "Telefónica"], ["REP", "Repsol"], ["FER", "Ferrovial"],
-    ["AMS", "Amadeus IT Group"], ["CLNX", "Cellnex Telecom"], ["ELE", "Endesa"], ["ACS", "ACS"],
-    ["GRF", "Grifols"], ["RED", "Redeia"], ["MAP", "Mapfre"],
-  ]),
-
-  ...list("IT_MIL", "EUR", [
-    ["ENEL", "Enel"], ["ISP", "Intesa Sanpaolo"], ["ENI", "Eni"], ["UCG", "UniCredit"],
-    ["RACE", "Ferrari"], ["G", "Assicurazioni Generali"], ["PRY", "Prysmian"],
-    ["MONC", "Moncler"], ["TIT", "Telecom Italia"], ["MB", "Mediobanca"], ["TRN", "Terna"],
-    ["SRG", "Snam"], ["BAMI", "Banco BPM"], ["PST", "Poste Italiane"], ["LDO", "Leonardo"],
-    ["CPR", "Davide Campari-Milano"],
-  ]),
-
-  // Tokyo quotes by four-digit code rather than letters; the name is what
-  // the pick editor searches on.
-  ...list("JP_TSE", "JPY", [
-    ["7203", "Toyota Motor"], ["6758", "Sony Group"], ["8306", "Mitsubishi UFJ Financial"],
-    ["9984", "SoftBank Group"], ["6861", "Keyence"], ["7974", "Nintendo"],
-    ["8035", "Tokyo Electron"], ["4063", "Shin-Etsu Chemical"], ["9432", "NTT"],
-    ["6098", "Recruit Holdings"], ["8058", "Mitsubishi Corporation"], ["6501", "Hitachi"],
-    ["4502", "Takeda Pharmaceutical"], ["7267", "Honda Motor"], ["6902", "Denso"],
-    ["8001", "Itochu"], ["9433", "KDDI"], ["6367", "Daikin Industries"],
-    ["4568", "Daiichi Sankyo"], ["8316", "Sumitomo Mitsui Financial"],
-  ]),
-
-  ...list("AU_ASX", "AUD", [
-    ["BHP", "BHP Group"], ["CBA", "Commonwealth Bank of Australia"], ["CSL", "CSL"],
-    ["NAB", "National Australia Bank"], ["WBC", "Westpac Banking"], ["ANZ", "ANZ Group"],
-    ["WES", "Wesfarmers"], ["MQG", "Macquarie Group"], ["WOW", "Woolworths Group"],
-    ["TLS", "Telstra Group"], ["RIO", "Rio Tinto"], ["FMG", "Fortescue"],
-    ["ALL", "Aristocrat Leisure"], ["WDS", "Woodside Energy"], ["COL", "Coles Group"],
-    ["STO", "Santos"], ["QAN", "Qantas Airways"], ["REA", "REA Group"],
-  ]),
-
-  // Priced alongside the picks for comparison, never pickable.
-  { symbol: "OMXS30", name: "OMX Stockholm 30", marketCode: "SE_LARGE", currency: "SEK", isBenchmark: true },
-  { symbol: "SPX", name: "S&P 500", marketCode: "US_NYSE", currency: "USD", isBenchmark: true },
-];
 
 /** Stable Firestore document id for an instrument. */
 export function instrumentId(marketCode: string, symbol: string): string {

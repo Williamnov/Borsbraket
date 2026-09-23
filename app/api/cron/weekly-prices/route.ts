@@ -76,11 +76,22 @@ type RoundPlan = {
   gaps: string[];
 };
 
+type SeenInstrument = { symbol?: string; marketCode?: string; currency?: string };
+
 /**
  * What every open round still needs, without fetching anything.
  *
- * Reads are shared across rounds: the instruments collection is fetched
- * once however many months are open at the same time.
+ * Reads are shared across rounds: an instrument held in two open months
+ * is fetched once, and so are the benchmarks.
+ *
+ * This used to read the whole instruments collection and pick out of it,
+ * which was nothing at four hundred documents and is a few thousand
+ * reads a day now that the universe is three and a half thousand — every
+ * day, for a handful of symbols, against a fifty thousand read quota
+ * this project has already exhausted once. What is actually wanted is
+ * known before any of it is read: whatever anybody holds, plus the
+ * benchmarks. So the picks come first and the instruments are fetched by
+ * id afterwards.
  */
 async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[]> {
   const open = rounds
@@ -89,12 +100,13 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
 
   if (open.length === 0) return [];
 
-  const instrumentsSnap = await db.collection("instruments").get();
-  const instruments = new Map(
-    instrumentsSnap.docs.map((d) => [d.id, { id: d.id, ...(d.data() as Record<string, unknown>) }]),
-  );
-
-  const plans: RoundPlan[] = [];
+  // Pass one: what is held, and what is already recorded.
+  type Pending = {
+    checkpoint: number;
+    picks: Set<string>;
+    existing: Map<string, Record<string, unknown>>;
+  };
+  const held = new Map<string, Pending>();
 
   for (const round of open) {
     const checkpoint = currentCheckpoint(round, now);
@@ -105,28 +117,56 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
       db.collection(`rounds/${round.id}/prices`).get(),
     ]);
 
-    // Everything held this month, plus the benchmarks.
-    const wanted = new Set<string>();
+    const picks = new Set<string>();
     for (const pickDoc of picksSnap.docs) {
       for (const id of Object.keys((pickDoc.data().picks ?? {}) as Record<string, unknown>)) {
-        wanted.add(id);
+        picks.add(id);
       }
     }
-    for (const [id, instrument] of instruments) {
-      if ((instrument as { isBenchmark?: boolean }).isBenchmark) wanted.add(id);
-    }
 
-    const existing = new Map(
-      pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]),
-    );
+    held.set(round.id, {
+      checkpoint,
+      picks,
+      existing: new Map(pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>])),
+    });
+  }
+
+  // Pass two: the benchmarks, and the held instruments by id.
+  const benchmarksSnap = await db.collection("instruments").where("isBenchmark", "==", true).get();
+  const benchmarkIds = benchmarksSnap.docs.map((d) => d.id);
+
+  const instruments = new Map<string, SeenInstrument>(
+    benchmarksSnap.docs.map((d) => [d.id, d.data() as SeenInstrument]),
+  );
+
+  const byId = [...new Set([...held.values()].flatMap((r) => [...r.picks]))].filter(
+    (id) => !instruments.has(id),
+  );
+  // getAll takes the references as arguments, so this is chunked rather
+  // than spread in one call — a month of picks is a couple of hundred
+  // ids, but nothing here guarantees that.
+  for (let start = 0; start < byId.length; start += 300) {
+    const refs = byId.slice(start, start + 300).map((id) => db.doc(`instruments/${id}`));
+    for (const snap of await db.getAll(...refs)) {
+      if (snap.exists) instruments.set(snap.id, snap.data() as SeenInstrument);
+    }
+  }
+
+  const plans: RoundPlan[] = [];
+
+  for (const round of open) {
+    const pending = held.get(round.id);
+    if (!pending) continue;
+    const { checkpoint, existing } = pending;
+
+    // Everything held this month, plus the benchmarks.
+    const wanted = new Set<string>([...pending.picks, ...benchmarkIds]);
     const field = WEEK_FIELDS[checkpoint];
     const requests: PriceRequest[] = [];
     const gaps: string[] = [];
 
     for (const id of wanted) {
-      const instrument = instruments.get(id) as
-        | { symbol?: string; marketCode?: string; currency?: string }
-        | undefined;
+      const instrument = instruments.get(id);
       if (!instrument?.symbol) continue;
 
       const current = existing.get(id);

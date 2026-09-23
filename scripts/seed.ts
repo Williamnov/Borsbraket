@@ -17,7 +17,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, type DocumentReference } from "firebase-admin/firestore";
-import { INSTRUMENTS, MARKETS, instrumentId } from "../lib/universe";
+import { MARKETS, instrumentId } from "../lib/universe";
+import { INSTRUMENTS } from "../lib/universe.instruments";
 
 function loadEnvFile(file: string): void {
   try {

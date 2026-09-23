@@ -90,6 +90,11 @@ borsbraket-*.csv
 export/
 exports/
 
+# scripts/verify-universe.ts writes this beside itself: one row per
+# instrument saying what the price feed made of it. The run's log is the
+# summary; this is the detail, and it belongs to the run, not the repo.
+universe-report.json
+
 # ── Operating system and editors ─────────────────────────────────────
 .DS_Store
 ._*
