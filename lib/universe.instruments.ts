@@ -23,8 +23,9 @@
  *
  * The Nordic segments are the exchange's own, which is what the previous
  * note here said could not be guessed at — and was right. They are
- * reviewed annually, so this is a snapshot: re-run the generator rather
- * than editing a name into a segment by hand.
+ * reviewed annually, so this is a snapshot: re-run the generator in
+ * scripts/build-universe rather than editing a name into a segment by
+ * hand. Its README has the sources, the size floors and the rules.
  *
  * ── What is NOT here ──────────────────────────────────────────────────
  *

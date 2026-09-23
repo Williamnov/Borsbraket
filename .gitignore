@@ -95,6 +95,19 @@ exports/
 # summary; this is the detail, and it belongs to the run, not the repo.
 universe-report.json
 
+# What scripts/build-universe downloads and produces on its way to
+# lib/universe.instruments.ts. Tens of megabytes of exchange listings and
+# cached Wikipedia articles; the generated file is the output worth
+# keeping, and the scripts say how to fetch the inputs again.
+scripts/build-universe/*.json
+scripts/build-universe/*.xlsx
+scripts/build-universe/wk_*.html
+scripts/build-universe/universe.instruments.ts
+
+# Python bytecode, from the same directory — the only Python here.
+__pycache__/
+*.pyc
+
 # ── Operating system and editors ─────────────────────────────────────
 .DS_Store
 ._*

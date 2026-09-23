@@ -169,7 +169,9 @@ Nothing in [`lib/universe.instruments.ts`](lib/universe.instruments.ts) is typed
 market is generated from a source that is accountable for the list: Nasdaq's own Nordic screener
 (which is where the Large, Mid, Small and First North segments come from — the exchange's
 classification, not a guess at it), Nasdaq's US screener with its market caps, JPX's listed-company
-master with its TOPIX size classes, and index constituent tables for the rest.
+master with its TOPIX size classes, and index constituent tables for the rest. The scripts that did
+it are in [`scripts/build-universe/`](scripts/build-universe/README.md), along with the size floors,
+what is regenerated versus merged, and why Euronext is not among the sources.
 
 That makes it right about what is listed and says nothing about what the price feed calls it, which
 is the part that matters on the Monday somebody's pick needs a number. A name nobody can price is
