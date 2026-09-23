@@ -19,6 +19,7 @@ import {
 import {
   useBenchmarks,
   useCountdown,
+  useInstrumentSearch,
   useMarketInstruments,
   useMyPicks,
   useRoundPicks,
@@ -51,14 +52,37 @@ function MonthView() {
   const { benchmarks: benchmarkInstruments } = useBenchmarks(true);
 
   const enabledMarkets = useMemo(() => markets.filter((m) => m.isEnabled), [markets]);
+
+  /**
+   * "" is All markets, and is the default.
+   *
+   * Which means the page has two ways of finding instruments and picks
+   * between them here rather than in the picker. A named market loads
+   * that market and the search filters what arrived; All markets loads
+   * nothing and asks the server for the few documents matching what has
+   * been typed. Either way PickEditor is handed a list and a loading
+   * flag and does not need to know which.
+   */
   const [marketCode, setMarketCode] = useState("");
+  const [search, setSearch] = useState("");
   useEffect(() => {
-    if (marketCode && enabledMarkets.some((m) => m.code === marketCode)) return;
-    if (enabledMarkets.length > 0) setMarketCode(enabledMarkets[0].code);
+    if (!marketCode) return;
+    if (enabledMarkets.some((m) => m.code === marketCode)) return;
+    setMarketCode("");
   }, [enabledMarkets, marketCode]);
 
-  const { instruments: marketInstruments, loading: instrumentsLoading } =
-    useMarketInstruments(marketCode || null);
+  const allMarkets = marketCode === "";
+
+  const { instruments: marketInstruments, loading: marketLoading } =
+    useMarketInstruments(allMarkets ? null : marketCode);
+  const {
+    instruments: searchHits,
+    loading: searchLoading,
+    tooShort,
+  } = useInstrumentSearch(search, allMarkets);
+
+  const pickerInstruments = allMarkets ? searchHits : marketInstruments;
+  const instrumentsLoading = allMarkets ? searchLoading : marketLoading;
 
   const round = useMemo(() => {
     const unsettled = rounds.filter((r) => r.status !== "settled");
@@ -135,10 +159,13 @@ function MonthView() {
             <PickEditor
               round={round}
               uid={profile.uid}
-              instruments={marketInstruments}
+              instruments={pickerInstruments}
               markets={markets}
               marketCode={marketCode}
               onMarketChange={setMarketCode}
+              search={search}
+              onSearchChange={setSearch}
+              searchTooShort={tooShort}
               instrumentsLoading={instrumentsLoading}
               myPicks={myPicks}
               maxPicks={maxPicks}

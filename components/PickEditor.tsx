@@ -8,19 +8,27 @@ import type { Instrument, Market, PickItem, PicksDoc, Round } from "@/lib/types"
 type Selection = Record<string, PickItem>;
 
 /**
- * Picking is market by market, deliberately.
+ * Two ways to find a stock, and the difference is a read cost.
  *
- * There used to be an "All markets" option, and the search box covered
- * every instrument in the league at once. That meant the page subscribed
- * to the whole `instruments` collection — fine at 460 documents, not fine
- * once the Stockholm segment lists are filled and it runs past a
- * thousand, because every cold visit paid for all of them and that is
- * the read that exhausted the free quota once already.
+ * **A named market** loads that market and nothing else, and the search
+ * box filters what arrived. This is the cheap one, and it is why the
+ * "All markets" option was taken away once: the old version subscribed
+ * to the whole `instruments` collection so that its search could cover
+ * everything, which was affordable at 460 documents and is not at four
+ * thousand — every cold visit paid for all of them, and that is the
+ * shape of the read that exhausted the daily quota once already.
  *
- * So a market is always selected, and only that market is loaded. The
- * search box searches within it. That is the trade: a list you have to
- * choose from first, in exchange for a read cost that no longer grows
- * with the size of the universe.
+ * **All markets** is back, and does not do that. It loads no market at
+ * all; the search term goes to the server and comes back with the
+ * handful of documents that match it. So it costs a few reads per
+ * search rather than the whole universe per visit, and it stays that way
+ * however many markets get added.
+ *
+ * The one thing it cannot do is match the middle of a word. Firestore
+ * has no substring search, so this is a prefix: "volvo" finds Volvo, and
+ * "olvo" finds nothing. Pick the market instead when you want to browse
+ * rather than search — that list is filtered in the browser and matches
+ * anywhere.
  */
 export function PickEditor({
   round,
@@ -29,24 +37,31 @@ export function PickEditor({
   markets,
   marketCode,
   onMarketChange,
+  search,
+  onSearchChange,
+  searchTooShort,
   instrumentsLoading,
   myPicks,
   maxPicks,
 }: {
   round: Round;
   uid: string;
-  /** Only the selected market's instruments. */
+  /** The selected market's instruments, or the search hits under All markets. */
   instruments: Instrument[];
   markets: Market[];
+  /** "" means All markets. */
   marketCode: string;
   onMarketChange: (code: string) => void;
+  search: string;
+  onSearchChange: (term: string) => void;
+  /** Under All markets, whether the term is still too short to search on. */
+  searchTooShort: boolean;
   instrumentsLoading: boolean;
   myPicks: PicksDoc | null;
   maxPicks: number;
 }) {
   const [selection, setSelection] = useState<Selection>(() => ({ ...(myPicks?.picks ?? {}) }));
   const [touched, setTouched] = useState(false);
-  const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: "good" | "bad"; text: string } | null>(null);
 
@@ -63,15 +78,23 @@ export function PickEditor({
     [instruments, enabledMarkets],
   );
 
+  const allMarkets = marketCode === "";
+
+  /**
+   * Under All markets the server has already done the matching, so
+   * filtering again here would only re-apply a prefix test to rows that
+   * passed it. Within one market the whole list is in the browser, so
+   * the filter is a substring and matches anywhere in the name.
+   */
   const results = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return pickable
-      .filter((i) =>
-        term ? i.symbol.toLowerCase().includes(term) || i.name.toLowerCase().includes(term) : true,
-      )
-      .sort((a, b) => a.symbol.localeCompare(b.symbol))
-      .slice(0, 40);
-  }, [pickable, search]);
+    const matched = allMarkets
+      ? pickable
+      : pickable.filter((i) =>
+          term ? i.symbol.toLowerCase().includes(term) || i.name.toLowerCase().includes(term) : true,
+        );
+    return [...matched].sort((a, b) => a.symbol.localeCompare(b.symbol)).slice(0, 40);
+  }, [pickable, search, allMarkets]);
 
   const chosen = Object.entries(selection).sort((a, b) => a[1].slot - b[1].slot);
   const full = chosen.length >= maxPicks;
@@ -185,8 +208,8 @@ export function PickEditor({
         <input
           type="search"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search company or ticker"
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={allMarkets ? "Search every market" : "Search company or ticker"}
           aria-label="Search for a stock"
           style={{ flex: "2 1 220px" }}
         />
@@ -196,6 +219,7 @@ export function PickEditor({
           aria-label="Choose a market"
           style={{ flex: "1 1 180px" }}
         >
+          <option value="">All markets</option>
           {markets
             .filter((m) => m.isEnabled)
             .map((m) => (
@@ -215,11 +239,26 @@ export function PickEditor({
         }}
       >
         {instrumentsLoading ? (
-          <div className="empty">Loading this market…</div>
+          <div className="empty">{allMarkets ? "Searching…" : "Loading this market…"}</div>
+        ) : allMarkets && searchTooShort ? (
+          <div className="empty">
+            Type a company or ticker to search every market at once. Or choose one market above to
+            browse it.
+          </div>
         ) : results.length === 0 ? (
           <div className="empty">
-            No eligible stock in this market matches that. Try another market, or ask an admin to
-            add it.
+            {allMarkets ? (
+              <>
+                Nothing starts with that. Searching every market matches the beginning of a name or
+                ticker, so try the first word — or pick the market above, where the search matches
+                anywhere.
+              </>
+            ) : (
+              <>
+                No eligible stock in this market matches that. Try another market, or ask an admin
+                to add it.
+              </>
+            )}
           </div>
         ) : (
           results.map((instrument) => {

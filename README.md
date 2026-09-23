@@ -29,6 +29,14 @@ had already moved. Sealing and measuring at the same instant gives everyone one 
 main North American and UK markets, the large continental European venues (Xetra, Paris, SIX,
 Amsterdam, Madrid, Milan), and Tokyo and Sydney.
 
+**Finding a stock** works two ways, and the difference is a read cost rather than a preference.
+Choose a market and the picker loads that market, so the search box filters a list already in your
+browser and matches anywhere in a name. Choose **All markets** and it loads nothing at all: what you
+type goes to the server, which returns the handful of documents that match. That costs a few reads
+per search instead of the whole universe per visit — which matters, because subscribing to the whole
+`instruments` collection is the read that exhausted the daily quota once already. The trade is that
+All markets matches the *beginning* of a name or ticker: "volvo" finds Volvo, "olvo" finds nothing.
+
 The full rules live at `/instructions` in the running app.
 
 ## What's in it

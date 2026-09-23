@@ -1,33 +1,51 @@
 /* ═══ BörsBråket — white, quiet, built for reading numbers ═══════════ */
 
+/*
+ * The palette and the shapes are the institutional-research look: slate
+ * neutrals, one deep red, and corners that are nearly square. It reads
+ * as a research note rather than a product, which is the right register
+ * for a page of returns.
+ *
+ * Everything below is a token, and almost nothing in this file sets a
+ * colour or a radius any other way — so the whole look turns on this
+ * block. Retarget these thirty lines and the rest follows.
+ */
 :root {
   color-scheme: light;
 
   --bg: #ffffff;
   --surface: #ffffff;
-  --surface-sunk: #f7f8f9;
-  --surface-hover: #f2f4f5;
+  --surface-sunk: #f8fafc;
+  --surface-hover: #f1f5f9;
 
-  --ink: #10161c;
-  --ink-2: #4d5763;
-  --ink-3: #79838f;
+  --ink: #0f172a;
+  --ink-2: #475569;
+  --ink-3: #64748b;
 
-  --line: #e4e7ea;
-  --line-strong: #cfd4d9;
+  --line: #e2e8f0;
+  --line-strong: #cbd5e1;
 
-  --accent: #0d5c45;
-  --accent-hover: #0a4735;
-  --accent-soft: #eef4f1;
+  /*
+   * The red is the brand, and it is also what a loss is drawn in. That
+   * doubling is deliberate in the reference and it survives here because
+   * the two never share a surface: the accent lives on buttons, links
+   * and the mark, and --down only ever colours a number in a table.
+   */
+  --accent: #a61c28;
+  --accent-hover: #8a1620;
+  --accent-soft: #fbf1f2;
 
-  --up: #10713a;
-  --down: #b42318;
+  --up: #1f6b45;
+  --down: #a61c28;
 
-  --gold: #a07d1f;
-  --silver: #6f7681;
-  --bronze: #96601f;
+  --gold: #9a7b1c;
+  --silver: #64748b;
+  --bronze: #92400e;
 
-  --radius: 10px;
-  --radius-sm: 7px;
+  /* Near-square. 2px is enough to stop the corners looking accidental
+     and not enough to read as a rounded interface. */
+  --radius: 2px;
+  --radius-sm: 2px;
 
   /* One spacing scale, so nothing is spaced by eye. */
   --s1: 4px;
@@ -38,13 +56,22 @@
   --s6: 32px;
   --s7: 48px;
 
-  --shadow-sm: 0 1px 2px rgba(16, 22, 28, 0.04);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* For the one or two things that should lift off the page — a panel
+     under the cursor, the masthead once it has something scrolled under
+     it. A long, very soft drop rather than a halo. */
+  --shadow-lift: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 28px -18px rgba(15, 23, 42, 0.25);
+
+  /* Tracking, for the small uppercase labels that carry this look. */
+  --tracking-wide: 0.08em;
+  --tracking-wider: 0.14em;
 
   /* next/font injects --font-sans-face / --font-display-face / --font-mono-face
      on <html>. The fallbacks keep the page readable if a face fails to load. */
   --font-body: var(--font-sans-face, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-display-face, ui-sans-serif), system-ui, sans-serif;
-  --font-brand: var(--font-brand-face, ui-sans-serif), system-ui, sans-serif;
+  --font-display: var(--font-display-face, ui-serif), Georgia, "Times New Roman", serif;
+  /* The wordmark is the text face now, set uppercase and tracked. */
+  --font-brand: var(--font-sans-face, ui-sans-serif), system-ui, sans-serif;
   --font-mono: var(--font-mono-face, ui-monospace), "SFMono-Regular", Menlo, monospace;
 }
 
@@ -183,7 +210,7 @@ a:hover { text-decoration: underline; }
 
 /* Set by the masthead itself once the page has scrolled under it. */
 .masthead.is-lifted {
-  box-shadow: 0 1px 12px rgba(16, 22, 28, 0.07);
+  box-shadow: var(--shadow-lift);
   border-color: var(--line-strong);
 }
 
@@ -226,13 +253,17 @@ a:hover { text-decoration: underline; }
 }
 .brand:hover { text-decoration: none; }
 
-/* The wordmark. A separate face from the rest of the app because the
-   logo is geometric and the display face is not — see app/layout.tsx. */
+/* The wordmark, set the way an institution sets its name: uppercase,
+   widely tracked, and small. Tracking adds space to the right of the
+   last letter as well, which would push the mark off centre — hence the
+   negative margin to take it back. */
 .brand-word {
   font-family: var(--font-brand);
   font-weight: 600;
-  font-size: 18px;
-  letter-spacing: -0.02em;
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  margin-right: calc(var(--tracking-wider) * -1);
   line-height: 1;
 }
 
@@ -245,7 +276,11 @@ a:hover { text-decoration: underline; }
   width: 27px;
   height: 19px;
   flex: 0 0 auto;
-  color: var(--ink);
+  /* The one piece of brand colour on a page that is otherwise slate and
+     white. A mark in the accent and a wordmark in ink reads as a
+     letterhead; both in the accent reads as a logo competing with the
+     content. */
+  color: var(--accent);
 }
 
 .nav {
@@ -547,7 +582,7 @@ th.center, td.center { text-align: center; }
   font-size: 15px;
   line-height: 1;
   background: var(--surface-sunk);
-  box-shadow: inset 0 0 0 1px rgba(16, 22, 28, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
 .avatar.lg { width: 56px; height: 56px; font-size: 27px; }
 .avatar.xl { width: 88px; height: 88px; font-size: 42px; }
@@ -587,7 +622,7 @@ th.center, td.center { text-align: center; }
   height: 15px;
   border-radius: 50%;
   background: var(--bg);
-  box-shadow: 0 0 0 1.5px var(--bg), 0 1px 3px rgba(16, 22, 28, 0.16);
+  box-shadow: 0 0 0 1.5px var(--bg), 0 1px 3px rgba(15, 23, 42, 0.16);
   font-size: 9px;
   line-height: 1;
   pointer-events: none;
@@ -695,7 +730,7 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  box-shadow: 0 14px 36px rgba(16, 22, 28, 0.18);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
   padding: var(--s2);
   animation: drop-in 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -793,7 +828,7 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 1px rgba(16, 22, 28, 0.18);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
   pointer-events: none;
 }
 
@@ -833,20 +868,32 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
 
 /* ── Pills ─────────────────────────────────────────────────────────── */
 
+/*
+ * Square, like everything else, and set as a small tracked label rather
+ * than a rounded badge — the pill shape was the one thing left that
+ * still read as a product interface.
+ */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 3px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
   color: var(--ink-2);
   white-space: nowrap;
 }
 .pill.open { color: var(--up); border-color: #bfe0cb; background: #f2f9f5; }
-.pill.live { color: var(--accent); border-color: #bcd6cc; background: var(--accent-soft); }
+/*
+ * "Running" is a state, not an alert — so it is deliberately NOT the
+ * accent. The accent is the same red as --down now, which would have
+ * made a month in progress look like the warning below it.
+ */
+.pill.live { color: var(--ink); border-color: var(--line-strong); background: var(--surface); }
 .pill.settled { color: var(--ink-3); background: var(--surface-sunk); }
 .pill.warn { color: var(--down); border-color: #f0c8c4; background: #fdf3f2; }
 
@@ -1025,7 +1072,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
   align-items: baseline;
   gap: 6px;
   padding: 5px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-sm);
   background: var(--surface-sunk);
   border: 1px solid var(--line);
   font-size: 13px;
@@ -1176,7 +1223,7 @@ fieldset { border: 0; margin: 0; padding: 0; }
   font-size: 12.5px;
   background: var(--surface-sunk);
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 5px;
 }
 

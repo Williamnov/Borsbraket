@@ -42,7 +42,7 @@ looked like success:
 
 ## Next steps, in order
 
-1. **`npm run seed`** — needed again, for NGM. The universe in the code is ahead of Firestore:
+1. **`npm run seed`** — needed again, for NGM **and for searching by name.** The universe in the code is ahead of Firestore:
    `SE_NGM` has 6 names and `SE_SME` 88, and neither is in the database yet, which is why the pick
    editor shows "No eligible stock in this market matches that" when NGM is selected. Nothing is
    broken; the instruments simply live in Firestore and the seed is what puts them there.
@@ -54,6 +54,10 @@ looked like success:
    One thing it will not do is rename a market. `SE_SME` is "NGM Growth Market" in the code now and
    the seed does update the market document, so that one is covered — but if a market ever needs
    removing rather than renaming, that is the admin panel.
+
+   The seed also writes a new `nameLower` field on every instrument, which is what the picker's
+   **All markets** search matches company names against. Until it runs, that option finds things by
+   ticker and not by name — no error, just half the results. Choosing a named market is unaffected.
 2. **Two GitHub repository secrets** to switch the price feed on: `SITE_URL` and `CRON_SECRET` (the
    same value as Vercel's). Until they exist the workflow exits green and says so. The price source
    needs no key — see the Twelve Data note below for why it is no longer three secrets.

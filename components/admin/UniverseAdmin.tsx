@@ -96,6 +96,10 @@ export function UniverseAdmin({
       await setDoc(doc(firestore(), "instruments", id), {
         symbol,
         name,
+        // Kept in step with scripts/seed.ts: the picker's "All markets"
+        // search matches on this, so a name added here that skipped it
+        // would be findable by ticker and invisible by name.
+        nameLower: name.toLowerCase(),
         marketCode: newMarket,
         currency: market?.currency ?? "SEK",
         eligible: true,

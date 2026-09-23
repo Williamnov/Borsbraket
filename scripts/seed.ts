@@ -96,6 +96,10 @@ async function main(): Promise<void> {
         {
           symbol: instrument.symbol,
           name: instrument.name,
+          // What the picker's "All markets" search matches on. Firestore
+          // compares case-sensitively and cannot lower-case in a query,
+          // so the lower-cased name has to be a field of its own.
+          nameLower: instrument.name.toLowerCase(),
           marketCode: instrument.marketCode,
           currency: instrument.currency,
           isBenchmark: instrument.isBenchmark === true,

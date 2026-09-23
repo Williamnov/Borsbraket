@@ -201,6 +201,18 @@ export type Instrument = {
   id: string;
   symbol: string;
   name: string;
+  /**
+   * `name` lower-cased, written at seed time and by the admin panel.
+   *
+   * Firestore has no case-insensitive comparison and no substring
+   * search, so searching every market at once — which is what the "All
+   * markets" option in the picker does — needs a field that is already
+   * in the case the query will be in. Optional because a document
+   * written before this existed will not have one; those are simply not
+   * found by name until the next seed, which is why useInstrumentSearch
+   * searches the symbol as well.
+   */
+  nameLower?: string;
   marketCode: string;
   currency: string;
   eligible: boolean;

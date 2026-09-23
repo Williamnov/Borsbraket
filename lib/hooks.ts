@@ -420,6 +420,101 @@ export function useMarketInstruments(marketCode: string | null) {
   return { instruments, loading };
 }
 
+/** How many matches "All markets" will show, per field. */
+const SEARCH_LIMIT = 25;
+
+/** Below this, a search across every market is too broad to be useful. */
+export const SEARCH_MIN_CHARS = 2;
+
+/**
+ * Search every market at once, without loading every market.
+ *
+ * The picker loads one market at a time on purpose — see
+ * useMarketInstruments — and an "All markets" option that subscribed to
+ * the whole collection would put back exactly the read that exhausted
+ * the daily quota. So this does not read the universe at all. It asks
+ * the server for the handful of documents whose symbol or name starts
+ * with what has been typed, and pays for those.
+ *
+ * Firestore has no substring search, so this is a prefix match: "volvo"
+ * finds Volvo, "olvo" finds nothing. Two queries, because a term can be
+ * either a ticker or a company and Firestore will not range over two
+ * fields in one. `` is the usual trick — a very high code point,
+ * so `[term, term + ]` spans every string starting with term.
+ *
+ * Neither query filters on `eligible` as well, which would make it a
+ * composite index and a deploy. At twenty-five rows each it is cheaper
+ * to drop the ineligible ones here.
+ *
+ * A document written before `nameLower` existed is found by symbol and
+ * not by name. That resolves itself on the next `npm run seed`.
+ */
+export function useInstrumentSearch(term: string, enabled: boolean) {
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const trimmed = term.trim();
+  const tooShort = trimmed.length < SEARCH_MIN_CHARS;
+
+  useEffect(() => {
+    if (!enabled || tooShort) {
+      setInstruments([]);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    // One query per keystroke would be a read per keystroke. A short
+    // pause costs nothing to a person typing and collapses "volvo" from
+    // five searches into one.
+    const timer = setTimeout(() => {
+      const db = firestore();
+      const bySymbol = trimmed.toUpperCase();
+      const byName = trimmed.toLowerCase();
+      const END = "";
+
+      const prefix = (field: string, value: string) =>
+        getDocs(
+          query(
+            collection(db, "instruments"),
+            orderBy(field),
+            where(field, ">=", value),
+            where(field, "<", value + END),
+            limit(SEARCH_LIMIT),
+          ),
+        );
+
+      Promise.all([prefix("symbol", bySymbol), prefix("nameLower", byName)])
+        .then(([symbolHits, nameHits]) => {
+          if (cancelled) return;
+          const merged = new Map<string, Instrument>();
+          for (const snap of [symbolHits, nameHits]) {
+            for (const d of snap.docs) {
+              merged.set(d.id, { ...(d.data() as Instrument), id: d.id });
+            }
+          }
+          setInstruments([...merged.values()]);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setInstruments([]);
+            setLoading(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [trimmed, tooShort, enabled]);
+
+  return { instruments, loading, tooShort };
+}
+
 /** How many price runs the admin panel keeps on screen. */
 const PRICE_RUN_WINDOW = 15;
 
