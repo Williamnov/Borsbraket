@@ -53,17 +53,30 @@ looked like success:
    the machine that built it was answered `HTTP 429` by Yahoo on every single request, for the whole
    session, so the check the old list was held to could not be run. The names come from each
    exchange's own lists, so they are right about what is listed; whether Yahoo spells them the same
-   way is the open question, and this is what answers it. No secrets, roughly ten minutes, and it
-   prints every symbol it could not price.
+   way is the open question, and this is what answers it. No secrets, about a quarter of an hour,
+   and it prints every symbol it could not price.
 
    It also settles the other thing a laptop could never test: whether a GitHub runner's shared
    address is already in Yahoo's bad books. It makes a couple of hundred requests from one.
 
 2. **`npm run seed`** — 3,584 instruments across 30 markets are in the code and not in Firestore.
-   Worth reading the Verify report first and deleting anything it could not price. Seeding is a
-   merge on a stable id, so a name that moved segment leaves its old document behind and eligible —
-   `SIMINN` in `IS_LARGE` is the one that has: Nasdaq Iceland no longer lists it, and nothing in the
-   seed deletes it. Set `eligible: false` on it from the admin panel once, after seeding.
+   Worth reading the Verify report first and deleting anything it could not price.
+
+   **Then retire twelve documents by hand, once.** The instrument id is `marketCode_SYMBOL`, and
+   seeding is a merge that only ever adds — so a name that changed segment or exchange gets a new
+   document while its old one stays behind, still eligible, and the same company appears twice in
+   the pick editor. Exactly twelve are in that state, and they are the whole list:
+
+   - Moved segment — the old list had Iceland's Mid Cap filed under Large Cap. All seven are in
+     `IS_MID` now: `IS_LARGE_BRIM`, `IS_LARGE_EIM`, `IS_LARGE_FESTI`, `IS_LARGE_HAGA`,
+     `IS_LARGE_ICEAIR`, `IS_LARGE_KVIKA`, `IS_LARGE_SJOVA`.
+   - Moved exchange: `US_NYSE_WMT` and `US_NYSE_SHOP` are in `US_NASDAQ` now, and `UK_LSE_FERG` is
+     in `US_NYSE`.
+   - Gone: `IS_LARGE_SIMINN`, which Nasdaq Iceland no longer lists, and `US_NASDAQ_EA`, which is
+     absent from Nasdaq's screener — Electronic Arts was taken private.
+
+   Set `eligible: false` on each from the admin panel after seeding. Nothing else moved: every
+   Swedish, Finnish and Danish name in the old list is still in the segment it was filed under.
 
 3. **Two GitHub repository secrets** to switch the price feed on: `SITE_URL` and `CRON_SECRET` (the
    same value as Vercel's). Until they exist the workflow exits green and says so. The price source

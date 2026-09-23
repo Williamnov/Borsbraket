@@ -217,8 +217,14 @@ WIKI = [
 # one source here with nobody accountable for it. Each override says what
 # the table claims and why it is not that.
 TICKER_FIX = {
-    # The SMI article gives Roche as "ROP". The index, and essentially all
-    # of the volume, is in the non-voting certificate, which is ROG.
+    # The SMI article gives Roche as "ROP", which is not a SIX ticker. The
+    # index line, and essentially all of the volume, is the non-voting
+    # participation certificate: ROG.
+    #
+    # Roche's bearer share, RO, is a separate matter and is left alone. It
+    # is a real second listing and a real SMIM constituent, so it arrives
+    # from that table and belongs in the universe the same way ERIC A and
+    # ERIC B both do.
     ("CH_SIX", "ROP"): "ROG",
 }
 
@@ -258,7 +264,6 @@ RETIRED = {
     ("US_NYSE", "SHOP"): "Shopify's listing is on Nasdaq now; it is in US_NASDAQ.",
     ("UK_LSE", "FERG"): "Ferguson's primary listing is NYSE now; it is in US_NYSE.",
     ("US_NASDAQ", "EA"): "Electronic Arts is absent from Nasdaq's screener — taken private.",
-    ("CH_SIX", "RO"): "Roche's bearer share barely trades; the index line is ROG.",
 }
 
 existing = json.load(open("existing.json"))
