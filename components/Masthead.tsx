@@ -98,30 +98,38 @@ export function Masthead() {
           <span className="brand-word">BörsBråket</span>
         </Link>
 
+        {/* The inner div is what gets clipped when the search opens. The
+            nav itself becomes a grid column that animates from 1fr to
+            0fr, which is the only way to slide it shut to its *own*
+            width — animating max-width means guessing a number, and a
+            guess that is too big spends half the animation doing
+            nothing visible. See the note in globals.css. */}
         <nav className="nav">
-          {LINKS.map((link) => {
-            const badge = link.href === "/chat" ? unread : 0;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={link.scope === "all" ? undefined : `is-${link.scope}`}
-                aria-current={pathname === link.href ? "page" : undefined}
-              >
-                {link.label}
-                {badge > 0 ? (
-                  <span className="nav-badge">
-                    {badge > 9 ? "9+" : badge}
-                    {/* The number alone reads as part of the label to a
-                        screen reader, so it says what it counts. */}
-                    <span className="visually-hidden">
-                      {` unread ${badge === 1 ? "message" : "messages"}`}
+          <div className="nav-links">
+            {LINKS.map((link) => {
+              const badge = link.href === "/chat" ? unread : 0;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={link.scope === "all" ? undefined : `is-${link.scope}`}
+                  aria-current={pathname === link.href ? "page" : undefined}
+                >
+                  {link.label}
+                  {badge > 0 ? (
+                    <span className="nav-badge">
+                      {badge > 9 ? "9+" : badge}
+                      {/* The number alone reads as part of the label to a
+                          screen reader, so it says what it counts. */}
+                      <span className="visually-hidden">
+                        {` unread ${badge === 1 ? "message" : "messages"}`}
+                      </span>
                     </span>
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
         </nav>
 
         {/* Players only, and it hides itself when there is nobody signed

@@ -2,7 +2,7 @@
 
 /*
  * The palette and the shapes are the institutional-research look: slate
- * neutrals, one deep red, and corners that are nearly square. It reads
+ * neutrals, one deep navy, and corners that are nearly square. It reads
  * as a research note rather than a product, which is the right register
  * for a page of returns.
  *
@@ -26,14 +26,19 @@
   --line-strong: #cbd5e1;
 
   /*
-   * The red is the brand, and it is also what a loss is drawn in. That
-   * doubling is deliberate in the reference and it survives here because
-   * the two never share a surface: the accent lives on buttons, links
-   * and the mark, and --down only ever colours a number in a table.
+   * Navy, not the reference's red.
+   *
+   * It suits a page of returns better than red did, for a reason worth
+   * writing down: red already means something here. It is the colour of
+   * a loss, in --down below and in every negative number in every table.
+   * An accent that shares it makes the interface argue with the data —
+   * a red button beside a red percentage reads as a warning about the
+   * number. Navy has no such job, so it can carry links, buttons and
+   * focus rings without saying anything about how the month is going.
    */
-  --accent: #a61c28;
-  --accent-hover: #8a1620;
-  --accent-soft: #fbf1f2;
+  --accent: #1b3a6b;
+  --accent-hover: #142c52;
+  --accent-soft: #eef2f8;
 
   --up: #1f6b45;
   --down: #a61c28;
@@ -64,14 +69,12 @@
 
   /* Tracking, for the small uppercase labels that carry this look. */
   --tracking-wide: 0.08em;
-  --tracking-wider: 0.14em;
 
   /* next/font injects --font-sans-face / --font-display-face / --font-mono-face
      on <html>. The fallbacks keep the page readable if a face fails to load. */
   --font-body: var(--font-sans-face, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: var(--font-display-face, ui-serif), Georgia, "Times New Roman", serif;
-  /* The wordmark is the text face now, set uppercase and tracked. */
-  --font-brand: var(--font-sans-face, ui-sans-serif), system-ui, sans-serif;
+  --font-brand: var(--font-brand-face, ui-sans-serif), system-ui, sans-serif;
   --font-mono: var(--font-mono-face, ui-monospace), "SFMono-Regular", Menlo, monospace;
 }
 
@@ -244,6 +247,20 @@ a:hover { text-decoration: underline; }
   flex-wrap: wrap;
 }
 
+/*
+ * While the search is open the bar must not wrap.
+ *
+ * The field grows and the nav shrinks over the same third of a second,
+ * and for part of it the two together are wider than the bar. Allowed to
+ * wrap, the sign-out button drops to a second row and comes back as the
+ * nav finishes closing — the masthead changes height twice in one
+ * gesture, which is what read as a flicker. Everything in here can shrink
+ * (the field has min-width: 0), so nowrap costs nothing.
+ */
+html[data-search-open="1"] .masthead-inner {
+  flex-wrap: nowrap;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
@@ -253,17 +270,15 @@ a:hover { text-decoration: underline; }
 }
 .brand:hover { text-decoration: none; }
 
-/* The wordmark, set the way an institution sets its name: uppercase,
-   widely tracked, and small. Tracking adds space to the right of the
-   last letter as well, which would push the mark off centre — hence the
-   negative margin to take it back. */
+/* The wordmark. A separate face from the rest of the app because the
+   logo is geometric and the display face is not — see app/layout.tsx.
+   It does not follow the rest of the design: the logo is a fixed point
+   and the page is built around it. */
 .brand-word {
   font-family: var(--font-brand);
   font-weight: 600;
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wider);
-  margin-right: calc(var(--tracking-wider) * -1);
+  font-size: 18px;
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 
@@ -276,20 +291,51 @@ a:hover { text-decoration: underline; }
   width: 27px;
   height: 19px;
   flex: 0 0 auto;
-  /* The one piece of brand colour on a page that is otherwise slate and
-     white. A mark in the accent and a wordmark in ink reads as a
-     letterhead; both in the accent reads as a logo competing with the
-     content. */
-  color: var(--accent);
+  color: var(--ink);
 }
 
+/*
+ * The nav collapses when the search opens, and it has to do it without
+ * anything else on the bar moving. Three things used to make that flicker
+ * rather than slide:
+ *
+ *  - It animated `max-width` from 1000px, a number picked to be safely
+ *    larger than the nav. The nav is about half that, so the first half
+ *    of the animation changed nothing visible and the second half did all
+ *    the work at once. That is the stutter.
+ *  - It switched `flex-wrap` from wrap to nowrap at the same moment.
+ *    `flex-wrap` does not animate, so the links snapped from however many
+ *    rows they were on to one, in a single frame, before the width had
+ *    moved at all.
+ *  - `.masthead-inner` wraps, so while the field was growing and the nav
+ *    had not yet shrunk, the bar was briefly too wide and the sign-out
+ *    button dropped to a second row and came back.
+ *
+ * So: a one-column grid that animates between `1fr` and `0fr`. An `fr`
+ * track resolves against the content, which means the animation runs
+ * across the nav's real width from the first frame to the last, with no
+ * number to guess and no wrap mode to switch.
+ */
 .nav {
+  display: grid;
+  /* minmax(0, …) rather than a bare fr: a grid item's automatic minimum
+     size is its content, so a plain `0fr` track refuses to shrink past
+     the width of the links and the nav never closes at all. The explicit
+     zero minimum is what lets the track reach nothing. */
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  transition:
+    grid-template-columns 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.2s ease;
+}
+
+.nav-links {
   display: flex;
   gap: var(--s1);
-  flex-wrap: wrap;
-  /* Big enough never to clip the real width; the point is only to have
-     a number to animate down to zero. */
-  max-width: 1000px;
+  /* Never wrapping, in either state. The links are clipped by the track
+     closing over them instead. */
+  flex-wrap: nowrap;
+  min-width: 0;
   overflow: hidden;
   /* The active page's underline hangs 13px below its link, level with
      the masthead's border, which `overflow: hidden` would cut off. The
@@ -297,9 +343,6 @@ a:hover { text-decoration: underline; }
      that room straight back out of the layout, so the bar is unmoved. */
   padding-bottom: 16px;
   margin-bottom: -16px;
-  transition:
-    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.18s ease;
 }
 
 /* Opening the search slides the field left across the tabs, and they
@@ -307,13 +350,9 @@ a:hover { text-decoration: underline; }
    component: the nav is a previous sibling of it, and CSS cannot look
    backwards. */
 html[data-search-open="1"] .nav {
-  max-width: 0;
+  grid-template-columns: minmax(0, 0fr);
   opacity: 0;
   pointer-events: none;
-  /* Without this the links keep wrapping as the width goes to zero, so
-     the nav ends up seven rows tall and shoves the masthead open —
-     clipped sideways, but nothing was clipping its height. */
-  flex-wrap: nowrap;
 }
 
 /* Active pages get a rule under the label rather than a filled chip:
@@ -681,11 +720,20 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
 
 .search-icon { width: 16px; height: 16px; }
 
-/* Slides out of the button rather than appearing beside it. Width and
-   padding are both animated so the field has no size at all while it is
-   shut and cannot push the nav around. */
-/* max-width rather than width, so the field can be a flex item that
-   fills whatever the collapsing nav hands back — and still animate. */
+/*
+ * Slides out of the button rather than appearing beside it. It has no
+ * size at all while shut, so it cannot push the nav around.
+ *
+ * max-width rather than width, so the field can be a flex item that
+ * fills whatever the collapsing nav hands back — and still animate. The
+ * duration and easing match .nav exactly on purpose: the two are one
+ * movement, the tabs sliding out as the field slides in, and a tenth of
+ * a second between them is enough to see them as two.
+ *
+ * The border is there in both states and only changes colour. Animating
+ * border-width instead would move the text inside the field by a pixel
+ * on open and again on close.
+ */
 .search-field {
   flex: 1 1 auto;
   max-width: 0;
@@ -699,8 +747,8 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
   opacity: 0;
   pointer-events: none;
   transition:
-    max-width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    padding 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    max-width 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    padding 0.34s cubic-bezier(0.22, 1, 0.36, 1),
     opacity 0.2s ease,
     border-color 0.2s ease;
 }
@@ -712,9 +760,12 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
   pointer-events: auto;
 }
 
+/* No sliding, just a fade: the width still changes, in one frame, so
+   nothing is clipped mid-gesture and nothing moves under the pointer. */
 @media (prefers-reduced-motion: reduce) {
   .nav,
   .search-field { transition: opacity 0.16s ease; }
+  .search-drop { animation: none; }
 }
 
 /* The results hang under the field, anchored to the right so a long list
@@ -888,12 +939,11 @@ html[data-search-open="1"] .search { flex: 1 1 auto; }
   white-space: nowrap;
 }
 .pill.open { color: var(--up); border-color: #bfe0cb; background: #f2f9f5; }
-/*
- * "Running" is a state, not an alert — so it is deliberately NOT the
- * accent. The accent is the same red as --down now, which would have
- * made a month in progress look like the warning below it.
- */
-.pill.live { color: var(--ink); border-color: var(--line-strong); background: var(--surface); }
+/* Four states, four colours that cannot be mistaken for one another:
+   green open, navy running, grey settled, red warning. Running took the
+   accent back once the accent stopped being red — while it was, a month
+   in progress looked like the alert underneath it. */
+.pill.live { color: var(--accent); border-color: #c5d2e6; background: var(--accent-soft); }
 .pill.settled { color: var(--ink-3); background: var(--surface-sunk); }
 .pill.warn { color: var(--down); border-color: #f0c8c4; background: #fdf3f2; }
 
