@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useLeagueBase } from "@/components/LeagueProvider";
 import { Avatar } from "@/components/ui";
@@ -39,6 +39,16 @@ const PAGES: { href: string; label: string; hint: string; admin?: boolean }[] = 
   { href: "/profile", label: "Profile", hint: "Your own page" },
   { href: "/admin", label: "Admin", hint: "Run the league", admin: true },
 ];
+
+/**
+ * useLayoutEffect, except on the server, where it does not exist and
+ * React warns about it.
+ *
+ * This component is prerendered like every other page here, so the bare
+ * hook would log on every build. There is nothing for a layout effect to
+ * do without a DOM anyway.
+ */
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** Case- and accent-insensitive, so "bjorn" finds "Björn". */
 function fold(value: string): string {
@@ -91,9 +101,18 @@ export function Search() {
     };
   }, [open, close]);
 
-  // Focus follows the field out, once it has somewhere to go.
+  /**
+   * Focus follows the field out, once it has somewhere to go.
+   *
+   * `preventScroll` because the masthead is sticky and watches the
+   * scroll position: if focusing a field that is still a few pixels wide
+   * made the browser scroll it into view, the bar's own handler would see
+   * the movement and lift or hide itself in the middle of the animation.
+   * Nothing here ever needs scrolling to — the field is in the bar you
+   * just clicked.
+   */
   useEffect(() => {
-    if (open) inputRef.current?.focus();
+    if (open) inputRef.current?.focus({ preventScroll: true });
   }, [open]);
 
   /**
@@ -106,8 +125,27 @@ export function Search() {
    * and the alternative is lifting this state into Masthead so it can
    * pass it to both. It is also how the rest of the app already answers
    * "who is looking at this"; see applyHintAttributes.
+   *
+   * ── Why this is a layout effect ───────────────────────────────────
+   *
+   * This was the flicker, and no amount of tuning the CSS could have
+   * fixed it, because the two halves of the gesture were landing in
+   * different frames.
+   *
+   * `useEffect` runs *after* the browser has painted. So clicking the
+   * trigger painted one frame in which `.search.is-open` was already set
+   * — the field had started growing — while `data-search-open` was not,
+   * meaning the nav was still at its full width and the rule that stops
+   * the bar wrapping had not applied either. For that one frame the
+   * masthead was wider than it could fit, so it wrapped: the sign-out
+   * button dropped to a second row and came straight back when the
+   * attribute landed a frame later. Twice per click, open and close.
+   *
+   * `useLayoutEffect` runs after the DOM is updated and before the paint,
+   * so the class and the attribute are always in the same frame and the
+   * bar is never in the inconsistent state at all.
    */
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const root = document.documentElement;
     if (open) root.setAttribute("data-search-open", "1");
     else root.removeAttribute("data-search-open");

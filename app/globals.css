@@ -345,6 +345,21 @@ html[data-search-open="1"] .masthead-inner {
   margin-bottom: -16px;
 }
 
+/*
+ * The links keep their own width while the track closes over them.
+ *
+ * Without this they are ordinary flex items with `flex-shrink: 1`, so a
+ * narrowing container squeezes them: the padding compresses, the labels
+ * reflow, and "How it works" breaks onto two lines on its way out. That
+ * is not a nav sliding behind a mask, it is a nav being crushed. Fixing
+ * the basis makes the overflow do the work instead, which is what the
+ * clip is there for.
+ */
+.nav-links > a {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 /* Opening the search slides the field left across the tabs, and they
    fold away behind it. The attribute is set on <html> by the Search
    component: the nav is a previous sibling of it, and CSS cannot look
