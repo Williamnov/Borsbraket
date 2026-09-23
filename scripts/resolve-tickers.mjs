@@ -4,22 +4,26 @@
  *
  * ── Why this exists ───────────────────────────────────────────────────
  *
- * The four Stockholm lists — Mid Cap, Small Cap, First North and
- * Spotlight — are published as company names, not tickers. The app needs
- * tickers, and a wrong one is the worst kind of wrong: it does not fail,
- * it quietly prices a different company for somebody's month. So the
- * names are never typed from memory and never guessed at. They are
- * matched against a list of real Stockholm listings, and anything that
- * does not match cleanly is printed for a human rather than invented.
+ * The Swedish lists below Large Cap — Mid Cap, Small Cap, First North,
+ * Spotlight and NGM's two segments — are published as company names, not
+ * tickers. The app needs tickers, and a wrong one is the worst kind of
+ * wrong: it does not fail, it quietly prices a different company for
+ * somebody's month. So the names are never typed from memory and never
+ * guessed at. They are matched against a list of real Swedish listings,
+ * and anything that does not match cleanly is printed for a human rather
+ * than invented.
  *
  * Membership comes from scripts/data/SE_*.txt, which are the index
- * constituents. Spotlight is fetched live from Spotlight's own API,
- * because they publish one.
+ * constituents. Spotlight and NGM are fetched live from their own APIs,
+ * because both publish one — which took two goes to establish: see the
+ * note above ngmLists().
  *
  * Tickers come from TradingView's Swedish screener, which is the only
  * free source found that returns ticker and name together in bulk —
- * Nasdaq's Nordic feed is retired, Nordnet needs a session, and Yahoo's
- * search endpoint rate-limits long before 600 lookups.
+ * Nordnet needs a session, and Yahoo's search endpoint rate-limits long
+ * before 600 lookups. It covers both venues: of its eleven hundred
+ * Swedish listings, 239 are on NGM, which is what makes matching NGM
+ * and Spotlight names against it work at all.
  *
  *   node scripts/resolve-tickers.mjs            # report only
  *   node scripts/resolve-tickers.mjs --write    # rewrite the seed block
@@ -113,6 +117,72 @@ async function spotlightNames() {
 }
 
 /**
+ * NGM's two equity segments, from NGM's own market pages.
+ *
+ * www.ngm.se/market is a single-page app and the API behind it is named
+ * in its own bundle: a POST to ngm-api-prod.vmate.se with a filter body,
+ * which returns every NGM equity with its segment and its ISIN. Worth
+ * knowing before writing NGM off again — ngm.se answers 406 to a request
+ * with no browser user-agent, which reads exactly like a venue that
+ * publishes nothing.
+ *
+ * "NGM Growth Market" is the MTF this universe's market list still calls
+ * Nordic SME. NGM's site no longer uses that name anywhere and its API
+ * reports exactly these two segments, so SE_SME keeps its code — no
+ * instrument id changes — and gets the current name in lib/universe.ts.
+ *
+ * Returns names, not tickers, even though the API has both: the point of
+ * the matching below is that a ticker is confirmed against a real
+ * listing rather than taken on one source's word.
+ */
+const NGM_SEGMENT = { "NGM Main Market": "SE_NGM", "NGM Growth Market": "SE_SME" };
+
+/**
+ * Subscription warrants and interim shares, which trade beside the
+ * ordinary share and are not the company.
+ *
+ * TO is teckningsoption, BTA a paid subscribed share, BTU a paid
+ * subscribed unit, UR and TR the rights themselves. They all expire, and
+ * a month is not a thing to hold one for. Matched on the ticker rather
+ * than the name so that a company merely containing the letters is safe.
+ */
+const NOT_AN_ORDINARY_SHARE = /(^|\s)(TO|BTA|BTU|BT|UR|TR|IR|UNIT|UNITS)(\s|$|\s*\d)/i;
+
+async function ngmLists() {
+  const response = await fetch("https://ngm-api-prod.vmate.se/instrument/list", {
+    method: "POST",
+    headers: {
+      "user-agent": UA,
+      "content-type": "application/json",
+      accept: "application/json",
+      origin: "https://www.ngm.se",
+      referer: "https://www.ngm.se/",
+    },
+    // The same endpoint serves sixty-odd thousand certificates and
+    // warrants; `market: "equities"` is what keeps them out.
+    body: JSON.stringify({ page: 0, size: 1000, market: "equities", instrumentType: "ALL" }),
+  });
+  if (!response.ok) throw new Error(`NGM: HTTP ${response.status}`);
+
+  const body = await response.json();
+  const rows = body.data ?? [];
+  if (rows.length < (body.totalNumber ?? 0)) {
+    throw new Error(`NGM returned ${rows.length} of ${body.totalNumber} — raise the page size`);
+  }
+
+  const lists = new Map(Object.values(NGM_SEGMENT).map((code) => [code, []]));
+  for (const row of rows) {
+    const marketCode = NGM_SEGMENT[row.marketSegment ?? ""];
+    // `type` is the exchange's own word for it, and separates the
+    // ordinary shares from the subscription rights outright.
+    if (!marketCode || row.type !== "Shares") continue;
+    if (NOT_AN_ORDINARY_SHARE.test(row.symbol) || NOT_AN_ORDINARY_SHARE.test(row.name)) continue;
+    lists.get(marketCode).push(row.name);
+  }
+  return [...lists];
+}
+
+/**
  * Our symbol from TradingView's.
  *
  * TradingView separates the share class with an underscore or a dot;
@@ -195,6 +265,17 @@ async function main() {
     console.log(`  failed: ${error.message}\n`);
   }
 
+  console.log("Fetching NGM's own company list…");
+  try {
+    for (const [marketCode, names] of await ngmLists()) {
+      console.log(`  ${marketCode}: ${names.length} companies`);
+      lists.push([marketCode, names]);
+    }
+    console.log();
+  } catch (error) {
+    console.log(`  failed: ${error.message}\n`);
+  }
+
   const resolved = new Map();
   const unmatched = [];
   const ambiguous = [];
@@ -243,8 +324,9 @@ async function main() {
     "/**",
     " * Generated by scripts/resolve-tickers.mjs — do not edit by hand.",
     " *",
-    " * The Stockholm segment lists, matched from published index",
-    " * membership against real listings. Re-run the script to refresh.",
+    " * The Swedish lists below Large Cap — Mid Cap, Small Cap, First",
+    " * North, Spotlight and NGM — matched from published membership",
+    " * against real listings. Re-run the script to refresh.",
     " */",
     "",
     'import type { InstrumentSeed } from "./universe";',

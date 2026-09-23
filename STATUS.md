@@ -2,7 +2,7 @@
 
 Where the project stands, so you can pick it up without re-reading anything.
 
-Last updated: 2026-09-22
+Last updated: 2026-09-23
 
 ## State
 
@@ -42,11 +42,18 @@ looked like success:
 
 ## Next steps, in order
 
-1. ~~**`npm run seed`**~~ — **done, 2026-09-22.** Firestore now holds 37 markets and 450
-   instruments, 448 of them eligible, plus two benchmarks and `settings/league`. All eight new
-   venues are populated: Xetra 24, Paris 25, SIX 20, Amsterdam 19, Madrid 15, Milan 16, Tokyo 20,
-   Sydney 18. Re-run it whenever `lib/universe.ts` changes — every write is a merge on a stable
-   document id, so it is safe to repeat.
+1. **`npm run seed`** — needed again, for NGM. The universe in the code is ahead of Firestore:
+   `SE_NGM` has 6 names and `SE_SME` 88, and neither is in the database yet, which is why the pick
+   editor shows "No eligible stock in this market matches that" when NGM is selected. Nothing is
+   broken; the instruments simply live in Firestore and the seed is what puts them there.
+
+   It was last run on 2026-09-22, when Firestore took 37 markets and 450 instruments. Re-run it
+   whenever `lib/universe.ts` or `lib/universe.generated.ts` changes — every write is a merge on a
+   stable document id, so it is safe to repeat and it only ever adds.
+
+   One thing it will not do is rename a market. `SE_SME` is "NGM Growth Market" in the code now and
+   the seed does update the market document, so that one is covered — but if a market ever needs
+   removing rather than renaming, that is the admin panel.
 2. **Two GitHub repository secrets** to switch the price feed on: `SITE_URL` and `CRON_SECRET` (the
    same value as Vercel's). Until they exist the workflow exits green and says so. The price source
    needs no key — see the Twelve Data note below for why it is no longer three secrets.
@@ -63,6 +70,25 @@ looked like success:
    metrics until tokens are arriving, *then* enable enforcement. That order matters — enforcing
    first locks every player out.
 
+## An unmerged branch worth knowing about
+
+`universe-from-exchanges` holds a second, broader attempt at the universe: 3,818 instruments across
+33 of the 37 markets, generated from each exchange's own lists rather than matched by name —
+Nasdaq's Nordic screener for the Large/Mid/Small segments of all four Nasdaq countries, Nasdaq's US
+screener with market caps, JPX's company master for Tokyo, index constituent tables for the rest.
+The generator and its README are on the branch under `scripts/build-universe/`.
+
+It is **not merged and not verified**. None of those 3,818 names has been through the matching that
+`resolve-tickers.mjs` does, and the machine that built it was answered `HTTP 429` by Yahoo on every
+request, so it could not be checked against the feed either. Only the NGM part was brought across,
+through the existing matcher, which is why NGM's names are trustworthy and the rest are not yet.
+
+What is worth taking from it, in rough order of value: Nasdaq's segment-filtered screener would
+replace the judgement calls behind the Large/Mid/Small labels and fill Helsinki, Copenhagen and
+Reykjavík; the US screener carries market caps, which are null everywhere today; and the branch's
+`verify-universe` script asks the feed about every symbol in one pass — though after the finding
+above it has to run from a domestic address, not a GitHub runner.
+
 ## Picking this up again
 
 Everything is committed and pushed, CI and the post-deploy check are green, and the site is live.
@@ -73,11 +99,16 @@ Two loose ends, neither of them urgent:
   First North constituents do not list it (it trades as a depository receipt), Bufab because the
   name did not match. They work and are pickable; they would just not come back from a fresh seed
   somewhere else. Either add them to `INSTRUMENTS` in `lib/universe.ts`, or leave them.
-- **55 names of ~670 were left unmatched or ambiguous** when the Stockholm lists were resolved. Run
+- **57 names of ~770 were left unmatched or ambiguous** when the Swedish lists were resolved. Run
   `node scripts/resolve-tickers.mjs` to see them. Most are renames the ticker source spells
   differently — "Know IT" against "Knowit", "Mekonomen" against "MEKO" — and the ambiguous ones are
   real share-class choices (SBB B or SBB D). Each needs a person to say which, which is why none of
   them were guessed.
+
+  Three of them are NGM's: `Obducat PREF B` and `Preservia Hyresfastigheter PREF` are ambiguous
+  between the ordinary and the preference line, and `Northern CapSek Ventures PREF` is the one name
+  TradingView does not carry at all. All three are preference shares, which is a fair thing for the
+  match to refuse to guess at.
 
 ## The price feed does not work from GitHub Actions
 
@@ -104,21 +135,32 @@ The code is correct and the symbols are right; the address is the problem. So th
   to Blaze is what unblocks it — and would also lift the daily read cap. In practice this is cheaper
   than it sounds: a 192px JPEG lands around 10 KB, so the 200 KB ceiling in the rules is a guard
   rail and not the going rate, and the whole league's pictures are a few hundred kilobytes.
-- **The growth lists need a constituent list from somewhere.** Mid Cap and Small Cap have a handful
-  of names now and First North has one, all added on request and each confirmed against the feed
-  before being written down. Spotlight, NGM and Nordic SME are still empty. Filling them properly
-  means First North Stockholm (~400 companies) and Spotlight (~170), which is not something to type
-  from memory: a wrong ticker does not fail, it prices a different company.
+- **NGM is filled now; only PepMarket is still empty.** NGM publishes a list after all. Its market
+  pages are a single-page app whose own bundle names the API behind them, and it returns every NGM
+  equity with its segment. The catch that hid it the first time: `ngm.se` answers `406` to any
+  request without a browser user-agent, which reads exactly like a venue that publishes nothing.
+  Worth remembering before writing another one off.
 
-  The obvious free sources are closed. Nasdaq's Nordic `DataFeedProxy` is retired and redirects to a
-  marketing page, Spotlight's own market overview renders its table in the browser, and Avanza's
-  screener endpoints 404. What is left: a paid reference-data feed — Modular Finance's own Holdings
-  or Dataflow would do exactly this — or a CSV somebody exports by hand and drops into
-  `lib/universe.ts`, or adding names one at a time from the admin panel as players ask for them.
+  `resolve-tickers.mjs` fetches it alongside Spotlight and puts the names through the same matcher,
+  so NGM's tickers are confirmed against a real listing rather than taken on NGM's word —
+  TradingView's Swedish screener carries 239 NGM listings, which is what makes that work. 94 of 97
+  resolved; the three left are named below.
 
-  Market caps are all null either way, so the Large/Mid/Small labels are placement by judgement
-  rather than by the current Nasdaq segmentation. Nothing depends on them but the heading a company
-  appears under, and moving one is a dropdown in the admin panel.
+  **`SE_SME` is NGM Growth Market now**, not Nordic SME. NGM's site does not use the old name
+  anywhere and its API reports exactly two equity segments. The market code is unchanged so no
+  instrument id moves; only the name players see.
+
+  Still empty: **NGM PepMarket**, which is a private-placement platform rather than a quoted market
+  — NGM's equity API reports two segments and that is not one of them — and **Spotlight Denmark**.
+  Both are arguably correct as empty and both can be closed from the admin panel.
+
+  Market caps are all null, so the Large/Mid/Small labels are placement by judgement rather than by
+  the current Nasdaq segmentation. Nothing depends on them but the heading a company appears under,
+  and moving one is a dropdown in the admin panel. **Nasdaq does publish the real segmentation** —
+  `api.nasdaq.com/api/nordic/screener/shares` takes `market` and `segment` filters and returns the
+  whole Nordic main market, 701 names with the exchange's own Large/Mid/Small split. That would
+  replace the judgement calls and fill Helsinki, Copenhagen and Reykjavík the same way. It is on the
+  `universe-from-exchanges` branch, unmerged — see the note at the end.
 - **`w0` changed meaning.** It is now the price at the lock, not the price at the start of the
   month — measuring from the 1st handed whoever submitted last three days of hindsight. Any prices
   recorded before this change still carry the old meaning. There were no settled months at the time,
