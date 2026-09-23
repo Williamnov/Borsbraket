@@ -1,7 +1,7 @@
 /**
  * The pickable universe: every instrument, by market.
  *
- * Split out of lib/universe.ts because it is three and a half thousand
+ * Split out of lib/universe.ts because it is nearly four thousand
  * rows, and UniverseAdmin — a client component — imports instrumentId
  * from there. Tree shaking ought to keep this out of the browser bundle
  * either way, but "ought to" is not a thing to leave a hundred and
@@ -29,11 +29,23 @@
  *
  * ── What is NOT here ──────────────────────────────────────────────────
  *
- * Spotlight, NGM, NGM PepMarket, Nordic SME, Spotlight Denmark and the
- * two Euronext Growth/Expand lists in Oslo are still empty. Those
- * venues publish no list this could read — Euronext actively refuses
- * one — so their names go in from the admin panel. The markets exist so
- * that an instrument has somewhere to go.
+ * Three markets are empty, and for different reasons.
+ *
+ * NGM PepMarket is a private-placement platform, not a quoted market.
+ * NGM's equity API reports two segments and that is not one of them, so
+ * there is nothing with a public price to put in it.
+ *
+ * Spotlight Denmark has no instruments: Spotlight's search knows of
+ * none, and every id it returns is on XSAT, its Swedish market.
+ *
+ * Euronext Expand and Euronext Growth in Oslo are the only two that are
+ * empty because the data could not be got. Euronext's listing endpoint
+ * answers with the right row count and every field blank unless the
+ * request arrives with a browser session, and the CSV download redirects
+ * to an antibot page. Those names go in from the admin panel.
+ *
+ * The markets exist either way, so that an instrument has somewhere to
+ * go, and any of them can be closed from the admin panel.
  *
  * ── Before trusting a new name ────────────────────────────────────────
  *
@@ -67,7 +79,8 @@ function list(
 export const INSTRUMENTS: InstrumentSeed[] = [
 
   // Sweden — Nasdaq Stockholm and First North ─────────────────────────
-  // Nasdaq's own screener, so the Large/Mid/Small split is the exchange's.
+  // Nasdaq's own screener, so the Large/Mid/Small split is the exchange's;
+  // Spotlight and NGM from their own sites.
 
   ...list("SE_LARGE", "SEK", [
     ["AAK", "AAK"], ["ABB", "ABB"], ["ALIF B", "AddLife B"], ["ANOD B", "Addnode Group B"],
@@ -330,6 +343,99 @@ export const INSTRUMENTS: InstrumentSeed[] = [
     ["WPTG B", "White Pearl Technology Group B"], ["WSG", "WS WeSports Group"],
     ["WYLD", "Wyld Networks"], ["XINT", "Xintela"], ["XMR", "XMReality"],
     ["XPC", "XP Chemistries"], ["ZAPLOX", "Zaplox"], ["ZZ B", "Zinzino B"],
+  ]),
+
+  ...list("SE_SPOT", "SEK", [
+    ["ABAS", "ABAS Protect"], ["ABERA", "Abera Bioscience"], ["ABSL B", "Absolicon B"],
+    ["ACUC", "AcuCort"], ["AERW B", "Aerowash B"], ["AIXIA B", "Aixia B"],
+    ["AMH2 B", "Amhult 2 B"], ["AMIDO", "Amido"], ["ANGL", "Angler Gaming"],
+    ["APRTEC", "APR Technologies"], ["APTA", "Aptahem"], ["AQUAT", "Aquaticus Real Estate"],
+    ["BTC B", "B Treasury Capital B"], ["BTC PREF A", "B Treasury Capital PREF A"],
+    ["BEYOND", "Beyond Frames"], ["BIOF", "Biofrigas"], ["BLICK", "Blick Global Group"],
+    ["CESSA", "Cessatech"], ["CHOSA", "CHOSA Oncology"], ["CURAS", "Curasight"],
+    ["DEX", "DexTech Medical"], ["DBP B", "Double Bond Pharmaceutical B"],
+    ["EASY B", "EasyFill B"], ["EATG", "EatGood"], ["ECRTO1", "EC European Capital RTO1"],
+    ["EXALT", "Exalt"], ["FABLE", "Fable Media Group"], ["FINE", "Finepart"],
+    ["FREETR", "Freetrailer"], ["FRILAN", "Frilans"], ["FXI", "FX International"],
+    ["GEAN", "Genetic Analysis"], ["GAD", "Gotland Art & Design"], ["GJAB", "Gullberg & Jansson"],
+    ["HAMLET B", "Hamlet BioPharma B"], ["HOME B", "HomeMaid B"], ["HUNTER", "Hunter Capital"],
+    ["HCRTO1", "Hunter Capital RTO 1"], ["HCRTO2", "Hunter Capital RTO 2"], ["ABI", "Igrene"],
+    ["ISAB", "Inhalation Sciences"], ["KAV", "Katalysen Ventures"], ["KONT", "Kontigo Care"],
+    ["KRONA", "Krona Public Real Estate"], ["LANE B", "Lane Capital Group B"],
+    ["LGOLD B", "Lappland Guldprospektering B"], ["LOGIST A", "Logistri A"],
+    ["LOVI", "Lovisagruvan"], ["MPOS", "Micropos Medical"], ["MOFAST", "Mofast"],
+    ["MBBAB", "MoveByBike"], ["MYBEAT", "My Beat"], ["NATTA", "Nattaro Labs"],
+    ["NILS", "Nilsson Special Vehicles"], ["NORDEN", "Norden Estates"], ["ODI", "ODI Pharma"],
+    ["PMED", "Peptonic Medical"], ["PEXA B", "PExA B"], ["PCAT", "Photocat"],
+    ["POLAR", "PolarCool"], ["PREBON", "Prebona"], ["PVRTO1", "PublicVC RTO1 AB B"],
+    ["QBNK", "QBank"], ["RAMSH", "Ramlösa Shipping"], ["REDS", "Redsense Medical"],
+    ["RESP", "Respiratorius"], ["SAFE", "Safe at Sea"], ["SERV", "Servana"],
+    ["SHT B", "SHT Smart High-Tech B"], ["SCC B", "Sjöstrand Coffee B"],
+    ["SOCIAL", "SOCIALLITE US"], ["SIN", "Solution International"],
+    ["STHLM", "Stockholm Treasury"], ["STRD B", "Suntrade Group B"], ["SUSG", "Sustainion"],
+    ["TRAN A", "Transferator A"], ["TRAN B", "Transferator B"], ["TURA", "Tura Group"],
+    ["UMIDA B", "Umida B"], ["UPGRAD", "Upgrade Invest Nordic"], ["VAXXA", "Vaxxa"],
+    ["VPAB B", "Veteranpoolen B"], ["VSD B", "VibroSense Dynamics B"], ["VIDH", "Vidhance"],
+    ["XOM B", "Xoma B"], ["ZENA SDR", "Zenith Energy SDR"], ["ZOOM", "Zoomability"],
+    ["BEO SDB", "Beowulf Mining SDB"], ["BHOLM", "Bergholm Fritidsfordon"],
+    ["BIBB", "BiBBInstruments"], ["BIOWKS", "Bio-Works Technologies"],
+    ["BPCINS", "BPC Instruments"], ["ECO B", "EcoRub B"], ["ENVI B", "Envirologic B"],
+    ["HFRTO B", "HF Reverse B"], ["LOVE B", "I LOVE LUND B"], ["LOGIST B", "Logistri B"],
+    ["PVRTO2", "PublicVC RTO2"], ["RECY B", "Recyctec B"], ["SLOTT B", "Slottsviken B"],
+    ["SOLIDX", "SolidX B"], ["WHITE B", "White Pebbles B"], ["ZENZIP B", "Zenergy B"],
+    ["C100", "C100"], ["CYCLE", "Cyclezyme"], ["EDYOU", "Edyoutec"], ["IMS", "Invent Medic"],
+    ["NIDHOG", "Nidhogg Resources"], ["RISK", "Risk Intelligence"], ["SYNT", "SyntheticMR"],
+    ["TESSIN", "Tessin Nordic"], ["TOUCH", "Touchtech"], ["XER", "Xer Tech"], ["ZENI", "Zenicor"],
+    ["HOODIN", "Hoodin"], ["MENDO", "Mendole"], ["MIR", "Miris"], ["MRSELL", "mResell"],
+    ["NFO", "NFO Drives"], ["ODIN", "Odinwell"], ["OPSYH", "Opsy"], ["PLEJD", "Plejd"],
+    ["PROVIT", "Provide IT"], ["SOUND", "Sound Dimension"], ["WEG", "Windon Energy Group"],
+    ["WTG", "Wonderful Times Group"], ["FLMNG", "Fleming Properties"], ["GOMERO", "Gomero Group"],
+    ["GOSOL", "Gosol Energy Group"], ["MONI", "Monivent"], ["PRESRV", "Preservium Property"],
+    ["PRPORT", "Proport Invest"], ["SMOL", "Smoltek"], ["SPERM", "Spermosens"],
+    ["LIGR", "Lightning Group"], ["NOVU", "Novus Group"], ["OURLIV", "OurLiving"],
+    ["SPGR", "Spotlight Group"], ["INSP", "Insplorion"],
+  ]),
+
+  ...list("SE_NGM", "SEK", [
+    ["SPLTN", "Spiltan Invest"], ["SOSI", "Sotkamo Silver"],
+    ["ASTOR", "Scandinavian Astor Group"], ["OBDU B", "Obducat B"],
+    ["GTAB B", "Glycorex Transplantation B"], ["AIK B", "AIK Fotboll B"],
+    ["OBDU PREF B", "Obducat PREF B"],
+  ]),
+
+  ...list("SE_SME", "SEK", [
+    ["KOBR B", "Kopparbergs B"], ["H100", "H100 Group"], ["BRIX", "Briox"],
+    ["ARBO A", "Arbona A"], ["STATE", "Safestate Group"], ["SEHED B", "SEHED Byggmästargruppen"],
+    ["INFRA", "Infracom"], ["REAL", "Real Fastigheter"], ["SHIP", "BlueYield"],
+    ["LATF B", "Latvian Forest Company B"], ["BLUE", "Bluelake Mineral"],
+    ["ARGO", "Argo Defence Group"], ["MCLR", "Medclair"], ["ENRAD", "Enrad"],
+    ["PRLD", "Prolight Diagnostics"], ["GARPCO B", "Garpco B"], ["NODE", "Nodebis Applications"],
+    ["NORDIG", "Nord Insuretech Group"], ["FRWA B", "Frontwalker"], ["TRIONA", "Triona"],
+    ["LINKAB", "Link Prop Investment"], ["BAT", "Eurobattery Minerals"],
+    ["TCC A", "TCECUR Sweden A"], ["CRWN", "Crown Energy"],
+    ["SDS", "Seamless Distribution Systems"], ["BESS", "Byhmgard"], ["NOWO", "Nowonomics"],
+    ["LOHILO", "Lohilo Foods"], ["FRNT B", "Front Ventures B"], ["INSIG PREF", "Insig Pref"],
+    ["EMART", "EmbeddedArt Group"], ["ADVT", "Adverty"], ["RMDX", "Railway Metrics and Dynamics"],
+    ["COEGIN", "Coegin Pharma"], ["MEGR", "Mediacle Group"], ["MAHVIE", "Mahvie Minerals"],
+    ["NGS", "NGS Group"], ["PIXEL", "PixelFox"], ["TRNSF", "Transfer Group"],
+    ["CARDEO", "Cardeon"], ["SYNEXO", "Synexo Group"], ["JDT", "JonDeTech Sensors"],
+    ["GMERC B", "Greenmerc"], ["GATE", "Jumpgate"], ["RLOS B", "RanLOS"], ["LAIR", "LightAir"],
+    ["KVIX", "Kvix"], ["SARS", "SARSYS"], ["DIV B", "Dividend Sweden B"], ["THINC", "Thinc"],
+    ["MEDFIN B", "Medicortex International B"], ["CRUST B", "Crustal Resources B"],
+    ["STVA B", "Star Vault B"], ["SBG", "StoneBeach Group"], ["DIAH", "Diadrom"],
+    ["VALUNO", "Valuno Group"], ["BUDDY B", "BuddyPro Group B"], ["HOLDFL", "Holdflight"],
+    ["ATANA", "Attana"], ["HYCO", "Hybricon"], ["QBRICK", "Qbrick"], ["TIRO", "Transiro"],
+    ["LEVBIO", "Level Bio"], ["SLG B", "Safe Lane Gaming B"], ["TRML", "Trainimal"],
+    ["NXAR", "Nexar Group"], ["SENS", "Sustainable Energy Solutions Sweden"],
+    ["RLVNC", "Relevance Communication Nordic"], ["GTG", "Gold Town Games"],
+    ["POLYMER", "Polymer Factory"], ["TPGR", "Time People Group"], ["LUMITO", "Lumito"],
+    ["AVSALT", "Avsalt Group"], ["BTCX", "Goobit Group"], ["HMPLY", "Hemply Balance"],
+    ["THRILL", "Gamethrill"], ["PHYR PREF", "Preservia Hyresfastigheter PREF"],
+    ["ECOMB", "ECOMB"], ["CRET", "Creturner Group"], ["WONDR", "Wonderboo"],
+    ["ABIG", "Abelco Investment Group"], ["36GRP", "36 Group"], ["AFRI", "Africa Resources"],
+    ["CAPS", "Northern CapSek Ventures"], ["RENT", "Rentunder"], ["F2M", "Free2Move"],
+    ["PHOL PREF", "Preservia Holding PREF"], ["PHYR B", "Preservia Hyresfastigheter B"],
+    ["CAPS PREF", "Northern CapSek Ventures PREF"], ["IMHO B", "IMHO Intermedia House"],
   ]),
 
   // Finland — Nasdaq Helsinki and First North ─────────────────────────

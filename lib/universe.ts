@@ -5,8 +5,8 @@
  * exchanges, the large continental European venues and Tokyo and Sydney.
  * Disable a market in the admin panel to close it.
  *
- * The instruments themselves are in ./universe.instruments — three and a
- * half thousand rows, generated from each exchange's own lists rather
+ * The instruments themselves are in ./universe.instruments — nearly four
+ * thousand rows, generated from each exchange's own lists rather
  * than typed out, which is also why the Mid and Small Cap segments are
  * no longer empty. See that file for where every market's names came
  * from and which venues still have none.
@@ -37,9 +37,13 @@ export const MARKETS: MarketSeed[] = [
   { code: "SE_SMALL", name: "Small Cap Stockholm", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 12 },
   { code: "SE_FN", name: "First North", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 13 },
   { code: "SE_SPOT", name: "Spotlight", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 14 },
-  { code: "SE_NGM", name: "NGM", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 15 },
+  { code: "SE_NGM", name: "NGM Main Market", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 15 },
   { code: "SE_NGMPEP", name: "NGM PepMarket", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 16 },
-  { code: "SE_SME", name: "Nordic SME Sweden", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 17 },
+  // The code stays SE_SME so no instrument id changes, but the name does
+  // not: NGM's MTF is called NGM Growth Market now, its own site no
+  // longer says "Nordic SME" anywhere, and its API reports exactly two
+  // equity segments — Main Market and Growth Market.
+  { code: "SE_SME", name: "NGM Growth Market", country: "Sweden", region: "Nordics", currency: "SEK", sortOrder: 17 },
 
   { code: "FI_LARGE", name: "Large Cap Helsinki", country: "Finland", region: "Nordics", currency: "EUR", sortOrder: 20 },
   { code: "FI_MID", name: "Mid Cap Helsinki", country: "Finland", region: "Nordics", currency: "EUR", sortOrder: 21 },

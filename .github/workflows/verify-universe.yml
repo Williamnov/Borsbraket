@@ -48,8 +48,8 @@ jobs:
   verify:
     name: Check every symbol against the feed
     runs-on: ubuntu-latest
-    # The default pass is about a quarter of an hour. `deep` paces three
-    # and a half thousand instruments at two seconds each, which is a bit
+    # The default pass is about a quarter of an hour. `deep` paces
+    # nearly four thousand instruments at two seconds each, which is a bit
     # over two hours — that is the job, not a hang.
     timeout-minutes: 180
     steps:

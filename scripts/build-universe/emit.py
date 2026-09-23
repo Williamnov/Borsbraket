@@ -5,6 +5,7 @@ from collections import Counter, OrderedDict
 
 ORDER = [
     ("SE_LARGE", "SEK"), ("SE_MID", "SEK"), ("SE_SMALL", "SEK"), ("SE_FN", "SEK"),
+    ("SE_SPOT", "SEK"), ("SE_NGM", "SEK"), ("SE_NGMPEP", "SEK"), ("SE_SME", "SEK"),
     ("FI_LARGE", "EUR"), ("FI_MID", "EUR"), ("FI_SMALL", "EUR"), ("FI_FN", "EUR"),
     ("DK_LARGE", "DKK"), ("DK_MID", "DKK"), ("DK_SMALL", "DKK"), ("DK_FN", "DKK"),
     ("NO_OSE", "NOK"),
@@ -29,7 +30,7 @@ HEADING = {
 }
 
 SOURCE_NOTE = {
-    "SE_LARGE": "Nasdaq's own screener, so the Large/Mid/Small split is the exchange's.",
+    "SE_LARGE": "Nasdaq's own screener, so the Large/Mid/Small split is the exchange's;\n  // Spotlight and NGM from their own sites.",
     "FI_LARGE": "Nasdaq's own screener.",
     "DK_LARGE": "Nasdaq's own screener.",
     "NO_OSE": "The OBX index, plus the names that were already here.",
@@ -57,7 +58,7 @@ out = []
 out.append('''/**
  * The pickable universe: every instrument, by market.
  *
- * Split out of lib/universe.ts because it is three and a half thousand
+ * Split out of lib/universe.ts because it is nearly four thousand
  * rows, and UniverseAdmin — a client component — imports instrumentId
  * from there. Tree shaking ought to keep this out of the browser bundle
  * either way, but "ought to" is not a thing to leave a hundred and
@@ -85,11 +86,23 @@ out.append('''/**
  *
  * ── What is NOT here ──────────────────────────────────────────────────
  *
- * Spotlight, NGM, NGM PepMarket, Nordic SME, Spotlight Denmark and the
- * two Euronext Growth/Expand lists in Oslo are still empty. Those
- * venues publish no list this could read — Euronext actively refuses
- * one — so their names go in from the admin panel. The markets exist so
- * that an instrument has somewhere to go.
+ * Three markets are empty, and for different reasons.
+ *
+ * NGM PepMarket is a private-placement platform, not a quoted market.
+ * NGM's equity API reports two segments and that is not one of them, so
+ * there is nothing with a public price to put in it.
+ *
+ * Spotlight Denmark has no instruments: Spotlight's search knows of
+ * none, and every id it returns is on XSAT, its Swedish market.
+ *
+ * Euronext Expand and Euronext Growth in Oslo are the only two that are
+ * empty because the data could not be got. Euronext's listing endpoint
+ * answers with the right row count and every field blank unless the
+ * request arrives with a browser session, and the CSV download redirects
+ * to an antibot page. Those names go in from the admin panel.
+ *
+ * The markets exist either way, so that an instrument has somewhere to
+ * go, and any of them can be closed from the admin panel.
  *
  * ── Before trusting a new name ────────────────────────────────────────
  *

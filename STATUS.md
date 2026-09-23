@@ -10,11 +10,15 @@ Deployed and running. CI builds it, typechecks it and runs both test suites on e
 `scripts/smoke.mjs` checks the deployed URL after each deploy — which, as of today, it genuinely
 does; see the note in Known gaps about the four days it spent grading Vercel's login page.
 
-**The universe is 3,584 instruments across 30 markets as of today, and none of it is in Firestore
-and none of it has been checked against the price feed.** Steps 1 and 2 below, in that order. The
-lists are generated from each exchange's own — Nasdaq's Nordic screener, Nasdaq's US screener, JPX's
-company master, index constituent tables for the rest — so nothing in them is a guess about what is
-listed, and everything in them is a guess about what Yahoo calls it.
+**The universe is 3,818 instruments across 30 markets as of today, and none of it is in Firestore.**
+That is the whole reason the pick editor still looks empty: the instruments live in Firestore, not in
+the code, and nothing reaches the site until somebody runs `npm run seed`. Steps 1 and 2 below, in
+that order.
+
+The lists are generated from each exchange's own — Nasdaq's Nordic screener, Nasdaq's US screener,
+JPX's company master, NGM's and Spotlight's market APIs, index constituent tables for the rest — so
+nothing in them is a guess about what is listed, and everything in them is a guess about what Yahoo
+calls it. None of it has been checked against the price feed yet.
 
 The faults found so far, all worth knowing about because every one of them failed in a way that
 looked like success:
@@ -49,7 +53,7 @@ looked like success:
 ## Next steps, in order
 
 1. **Run the Verify universe workflow**, from the Actions tab, before seeding. The universe went
-   from 403 instruments to 3,584 and **not one of them has been checked against the price feed** —
+   from 403 instruments to 3,818 and **not one of them has been checked against the price feed** —
    the machine that built it was answered `HTTP 429` by Yahoo on every single request, for the whole
    session, so the check the old list was held to could not be run. The names come from each
    exchange's own lists, so they are right about what is listed; whether Yahoo spells them the same
@@ -59,8 +63,9 @@ looked like success:
    It also settles the other thing a laptop could never test: whether a GitHub runner's shared
    address is already in Yahoo's bad books. It makes a couple of hundred requests from one.
 
-2. **`npm run seed`** — 3,584 instruments across 30 markets are in the code and not in Firestore.
-   Worth reading the Verify report first and deleting anything it could not price.
+2. **`npm run seed`** — 3,818 instruments across 30 markets are in the code and not in Firestore.
+   **This is the step that makes any of it appear in the pick editor.** Worth reading the Verify
+   report first and deleting anything it could not price.
 
    **Then retire twelve documents by hand, once.** The instrument id is `marketCode_SYMBOL`, and
    seeding is a merge that only ever adds — so a name that changed segment or exchange gets a new
@@ -127,19 +132,28 @@ twenty symbols to a request, and stops the moment it is refused.
   to Blaze is what unblocks it — and would also lift the daily read cap. In practice this is cheaper
   than it sounds: a 192px JPEG lands around 10 KB, so the 200 KB ceiling in the rules is a guard
   rail and not the going rate, and the whole league's pictures are a few hundred kilobytes.
-- **Seven markets are still empty**, and market caps are still all null. Mid Cap, Small Cap and
-  First North are no longer among them: Nasdaq publishes its own screener, segment by segment and
-  country by country, so the membership this used to say could only be guessed at is now taken from
-  the exchange itself and regenerated rather than typed. What has no reachable source is Spotlight,
-  NGM, NGM PepMarket, Nordic SME, Spotlight Denmark and the two Euronext Growth/Expand lists in
-  Oslo — Spotlight and NGM render their lists in the browser against a widget, and Euronext's
-  listing endpoint returns rows with every field blank unless you arrive with its session. Those go
-  in from the admin panel.
+- **Three markets are empty, and only one of them for want of data.** Market caps are still all
+  null.
 
-  **Modular Finance's own Holdings and Dataflow cover exactly these venues**, and would replace the
+  NGM PepMarket is a private-placement platform rather than a quoted market — NGM's equity API
+  reports two segments and that is not one of them — and Spotlight Denmark has no instruments at
+  all, since every id Spotlight's search returns is on XSAT, its Swedish market. Both are arguably
+  correct as empty, and both can be closed from the admin panel.
+
+  **Euronext Expand and Euronext Growth in Oslo** are the ones that are empty because the data could
+  not be got. Euronext's listing endpoint answers with the right row count and every field blank
+  unless the request carries a browser session, and the CSV download redirects to an antibot page.
+  Those names go in from the admin panel.
+
+  Spotlight and NGM were on this list too, until they were looked at a second time — the first
+  attempt failed on a missing browser user-agent (NGM answers 406 without one) and a missing
+  `/Umbraco` path segment on Spotlight's search, both of which read exactly like "this venue
+  publishes nothing". They are worth 236 instruments between them.
+
+  **Modular Finance's own Holdings and Dataflow cover all of these venues**, and would replace the
   whole scraped arrangement with one authoritative source including the market caps. The MCP
-  connectors for it need an authorisation this session could not perform. Worth doing properly
-  before hand-typing a Spotlight list.
+  connectors for it need an authorisation this session could not perform. That is still the right
+  answer for Oslo, and for the market caps.
 - **`w0` changed meaning.** It is now the price at the lock, not the price at the start of the
   month — measuring from the 1st handed whoever submitted last three days of hindsight. Any prices
   recorded before this change still carry the old meaning. There were no settled months at the time,
@@ -155,7 +169,7 @@ twenty symbols to a request, and stops the moment it is refused.
   that this is the scoring read path and a wrong summary is a wrong scoreboard, silently. With no
   settled month in the database there is nothing to check a summary against yet, so the honest order
   is: settle a month, then build it, then verify the two agree before the recomputation is removed.
-- **The universe is 3,584 instruments now, not the 403 it was**, and that is nine times the number
+- **The universe is 3,818 instruments now, not the 403 it was**, and that is nine times the number
   that blew the read quota. Worth knowing exactly where that lands before it surprises anyone:
 
   - **The daily price job no longer reads it.** It used to fetch the whole instruments collection to
@@ -164,7 +178,7 @@ twenty symbols to a request, and stops the moment it is refused.
     id. That is the one place the growth would have cost something every day, and it is fixed.
   - **`/month` and the admin panel still read all of it, once per device.** Both genuinely need the
     whole list — one to pick from, one to edit. It is `onSnapshot` over a persistent cache, so a
-    device pays the 3,584 once and then only for what changed; the exposure is a cold cache, and
+    device pays the 3,818 once and then only for what changed; the exposure is a cold cache, and
     around thirteen of those in a day would reach the free tier's 50,000.
   - **`/history`, `/league` and the profile pages read none of it.** They query `isBenchmark`, and
     the picks carry their own symbols and names.

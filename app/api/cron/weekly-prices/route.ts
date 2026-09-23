@@ -86,7 +86,7 @@ type SeenInstrument = { symbol?: string; marketCode?: string; currency?: string 
  *
  * This used to read the whole instruments collection and pick out of it,
  * which was nothing at four hundred documents and is a few thousand
- * reads a day now that the universe is three and a half thousand — every
+ * reads a day now that the universe is nearly four thousand — every
  * day, for a handful of symbols, against a fifty thousand read quota
  * this project has already exhausted once. What is actually wanted is
  * known before any of it is read: whatever anybody holds, plus the

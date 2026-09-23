@@ -17,10 +17,10 @@ anything.
   not at the start of the month. Measuring from the 1st would hand whoever submits last three
   days of hindsight; sealing and measuring at the same instant gives everyone one starting price.
 - **Points**: 10 / 7 / 5 / 4 / 3 / 2, then 1 for everyone else who submitted.
-- **Eligible markets**: 30 of them, holding 3,584 instruments — every Nordic list from Large Cap
-  down to First North (Sweden, Finland, Denmark, Norway, Iceland), the main North American and UK
-  markets, the large continental European venues (Xetra, Paris, SIX, Amsterdam, Madrid, Milan) and
-  Tokyo and Sydney. Any of them can be closed from the admin panel.
+- **Eligible markets**: 30 of them, holding 3,818 instruments — every Nordic list from Large Cap
+  down to First North, Spotlight and NGM (Sweden, Finland, Denmark, Norway, Iceland), the main North
+  American and UK markets, the large continental European venues (Xetra, Paris, SIX, Amsterdam,
+  Madrid, Milan) and Tokyo and Sydney. Any of them can be closed from the admin panel.
 - **No penny stocks.** Only instruments an admin has marked eligible can be picked, and that is
   checked when picks are saved. The filter is company size, not share price.
 
@@ -69,7 +69,7 @@ npm install
 npm run seed
 ```
 
-That writes the 30 markets, the 3,584 instruments and the league settings. Every write is a merge on
+That writes the 30 markets, the 3,818 instruments and the league settings. Every write is a merge on
 a stable document id, so it is safe to run again — but note that it only ever adds and updates.
 Nothing in it deletes, so an instrument that has left the exchange, or moved between the Large and
 Mid Cap segments, keeps its old document and stays pickable until someone marks it ineligible in the
@@ -159,7 +159,7 @@ dropped, so a replayed request cannot rewrite a checkpoint that is already final
 
 The plan asks for what is held, not for everything. It reads the month's picks, queries the two
 benchmarks, and fetches those instruments by id — it does **not** read the instruments collection.
-At four hundred names that distinction was academic; at three and a half thousand it is a few
+At four hundred names that distinction was academic; at nearly four thousand it is a few
 thousand reads a day, every day, against a fifty thousand read quota this project has already
 exhausted once.
 
@@ -169,8 +169,8 @@ Nothing in [`lib/universe.instruments.ts`](lib/universe.instruments.ts) is typed
 market is generated from a source that is accountable for the list: Nasdaq's own Nordic screener
 (which is where the Large, Mid, Small and First North segments come from — the exchange's
 classification, not a guess at it), Nasdaq's US screener with its market caps, JPX's listed-company
-master with its TOPIX size classes, and index constituent tables for the rest. The scripts that did
-it are in [`scripts/build-universe/`](scripts/build-universe/README.md), along with the size floors,
+master with its TOPIX size classes, NGM's and Spotlight's own sites for the Swedish growth venues,
+and index constituent tables for the rest. The scripts that did it are in [`scripts/build-universe/`](scripts/build-universe/README.md), along with the size floors,
 what is regenerated versus merged, and why Euronext is not among the sources.
 
 That makes it right about what is listed and says nothing about what the price feed calls it, which
@@ -190,9 +190,11 @@ shape: twenty symbols per request for the whole universe, then a closer look onl
 not resolve, plus a sample of each market to catch a suffix aimed at the wrong exchange. `--deep`
 checks all of them individually and takes two hours.
 
-Seven markets are deliberately empty — Spotlight, NGM, NGM PepMarket, Nordic SME, Spotlight Denmark
-and the two Euronext Growth/Expand lists in Oslo. None of those venues publishes a list this could
-read. Add those names from the admin panel; the markets exist so they have somewhere to go.
+Three markets are empty. NGM PepMarket is a private-placement platform rather than a quoted market,
+and Spotlight Denmark has no instruments — Spotlight's own search knows of none. Only **Euronext
+Expand and Euronext Growth in Oslo** are empty for want of data: Euronext's listing endpoint returns
+the right row count with every field blank unless the request carries a browser session, and the CSV
+download redirects to an antibot page. Add those from the admin panel.
 
 Translating a market code into whatever a particular feed calls that exchange lives in the fetcher,
 beside the feed, because each one spells it differently: Twelve Data wanted an ISO 10383 MIC, Yahoo

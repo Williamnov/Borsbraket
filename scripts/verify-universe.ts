@@ -7,7 +7,7 @@
  * fine in the pick editor, it looks fine at submission, and it turns
  * into a gap in the middle of a month that someone has to fill by hand
  * while the price is still today's. The universe grew from four hundred
- * names to three and a half thousand in one commit, generated from each
+ * names to nearly four thousand in one commit, generated from each
  * exchange's own lists, and not one of those was checked against the
  * feed at the time — the machine that built it was being answered 429 by
  * Yahoo on every request, for days. This is the check that was owed.
@@ -28,7 +28,7 @@
  *
  * Nothing in money: the feed needs no key and the repository is public,
  * so the runner minutes are free. What it does spend is the goodwill of
- * an address the weekly price job depends on. Checking three and a half
+ * an address the weekly price job depends on. Checking nearly four
  * thousand symbols one at a time is two hours of steady requests at a
  * feed that throttles by address and publishes no limit — a good way to
  * get the runners blocked and break the thing this is protecting.

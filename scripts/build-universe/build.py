@@ -122,6 +122,58 @@ for row in json.load(open("nordic.json")):
     add(market, row["symbol"], row["name"], row["currency"] or "SEK", f"nasdaq:{market}")
 
 
+# ── 1b. the Swedish growth venues, from their own sites ───────────────
+#
+# Nasdaq is not the only exchange in Stockholm. NGM and Spotlight run
+# their own, and both were written off as unreachable on the first pass
+# for reasons that turned out to be one wrong header and one missing path
+# segment — see ngm.mjs and spotlight.mjs.
+#
+# Their lists are mostly small companies, and small companies raise money
+# by issuing subscription warrants and interim shares, which are quoted
+# alongside the ordinary share and are not the company. TO is
+# teckningsoption, BTA a paid subscribed share, BTU a paid subscribed
+# unit, UR and TR the subscription rights themselves. None of them is a
+# thing to pick for a month, and all of them expire.
+NOT_AN_ORDINARY_SHARE = re.compile(
+    r"(^|\s)(TO|BTA|BTU|BT|UR|TR|IR|UNIT|UNITS)(\s|$|\s*\d)", re.I
+)
+
+
+def ordinary(symbol, name):
+    return not (NOT_AN_ORDINARY_SHARE.search(symbol) or NOT_AN_ORDINARY_SHARE.search(name))
+
+
+# NGM's own two equity segments. "NGM Growth Market" is the MTF that this
+# universe's market list still calls Nordic SME — NGM's site no longer
+# uses that name anywhere, and its API reports exactly these two. The
+# market code stays SE_SME so that no instrument id changes; the name
+# shown to players is corrected in lib/universe.ts.
+NGM_SEGMENT = {
+    "NGM Main Market": "SE_NGM",
+    "NGM Growth Market": "SE_SME",
+}
+
+for row in json.load(open("ngm.json")):
+    market = NGM_SEGMENT.get(row["segment"] or "")
+    if not market or row["type"] != "Shares":
+        continue
+    if not ordinary(row["symbol"], row["name"]):
+        continue
+    add(market, row["symbol"], row["name"], "SEK", f"ngm:{market}")
+
+# Spotlight's search returns no segment and no country, but every
+# instrument id came back on XSAT, which is Spotlight's Swedish market.
+# Spotlight Denmark (DK_SPOT) has nothing in it — the search knows of no
+# such instrument.
+for row in json.load(open("spotlight.json")):
+    if not row["instrumentId"].startswith("XSAT"):
+        continue
+    if not ordinary(row["symbol"], row["name"]):
+        continue
+    add("SE_SPOT", row["symbol"], row["name"], "SEK", "spotlight:SE_SPOT")
+
+
 # ── 2. the US, from Nasdaq's screener, by market cap ──────────────────
 
 US_MARKET = {"NYSE": "US_NYSE", "NASDAQ": "US_NASDAQ", "AMEX": "US_AMEX"}
