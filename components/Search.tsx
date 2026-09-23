@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useLeagueBase } from "@/components/LeagueProvider";
 import { Avatar } from "@/components/ui";
@@ -11,10 +11,16 @@ import { profileDescription, type Profile } from "@/lib/types";
 /**
  * Find a player or a page, from the masthead.
  *
- * A magnifying glass that slides a field out in place rather than a
+ * A magnifying glass that wipes a field across the tabs rather than a
  * dialog over the page: the search belongs to the navigation, so it
  * stays in the navigation. It closes on Escape, on a click anywhere
  * else, and on picking a result.
+ *
+ * The field is positioned over the nav and nothing in the masthead
+ * changes size when it opens — which is not a detail. Two earlier
+ * versions animated the nav's width instead, and a bar that reflows on
+ * every frame of an animation is a bar that wraps and unwraps while you
+ * watch it.
  *
  * Deliberately not a search over stocks or messages. Those want different
  * answers — a stock search belongs in the pick editor next to the list it
@@ -39,16 +45,6 @@ const PAGES: { href: string; label: string; hint: string; admin?: boolean }[] = 
   { href: "/profile", label: "Profile", hint: "Your own page" },
   { href: "/admin", label: "Admin", hint: "Run the league", admin: true },
 ];
-
-/**
- * useLayoutEffect, except on the server, where it does not exist and
- * React warns about it.
- *
- * This component is prerendered like every other page here, so the bare
- * hook would log on every build. There is nothing for a layout effect to
- * do without a DOM anyway.
- */
-const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /** Case- and accent-insensitive, so "bjorn" finds "Björn". */
 function fold(value: string): string {
@@ -115,42 +111,18 @@ export function Search() {
     if (open) inputRef.current?.focus({ preventScroll: true });
   }, [open]);
 
-  /**
-   * The open state goes on <html> so the masthead's navigation can react
-   * to it: the field slides left across the tabs, and they fold away
-   * behind it.
+  /*
+   * There was an effect here that put the open state on <html>, so the
+   * nav — a previous sibling, which CSS cannot look back at — could
+   * collapse out of the field's way.
    *
-   * An attribute rather than a class on a shared parent because the nav
-   * is a previous sibling of this component — CSS cannot look backwards,
-   * and the alternative is lifting this state into Masthead so it can
-   * pass it to both. It is also how the rest of the app already answers
-   * "who is looking at this"; see applyHintAttributes.
-   *
-   * ── Why this is a layout effect ───────────────────────────────────
-   *
-   * This was the flicker, and no amount of tuning the CSS could have
-   * fixed it, because the two halves of the gesture were landing in
-   * different frames.
-   *
-   * `useEffect` runs *after* the browser has painted. So clicking the
-   * trigger painted one frame in which `.search.is-open` was already set
-   * — the field had started growing — while `data-search-open` was not,
-   * meaning the nav was still at its full width and the rule that stops
-   * the bar wrapping had not applied either. For that one frame the
-   * masthead was wider than it could fit, so it wrapped: the sign-out
-   * button dropped to a second row and came straight back when the
-   * attribute landed a frame later. Twice per click, open and close.
-   *
-   * `useLayoutEffect` runs after the DOM is updated and before the paint,
-   * so the class and the attribute are always in the same frame and the
-   * bar is never in the inconsistent state at all.
+   * Nothing needs it now, and that is worth more than the tidiness.
+   * While the attribute was set from an effect it landed a frame after
+   * the class that opens the field, and a masthead caught for one frame
+   * between two layouts is what the flicker was. There is no second
+   * place to keep in step any more: `.search.is-open` on this
+   * component's own root is the whole of the state.
    */
-  useIsomorphicLayoutEffect(() => {
-    const root = document.documentElement;
-    if (open) root.setAttribute("data-search-open", "1");
-    else root.removeAttribute("data-search-open");
-    return () => root.removeAttribute("data-search-open");
-  }, [open]);
 
   const results = useMemo<Target[]>(() => {
     const needle = fold(query.trim());
@@ -201,9 +173,10 @@ export function Search() {
 
   return (
     <div ref={rootRef} className={`search${open ? " is-open" : ""}`}>
-      {/* The field comes first so it grows leftwards, out of the icon and
-          across the navigation. Always in the markup so it has a width to
-          animate from, and out of the tab order while it is shut. */}
+      {/* Always in the markup, and always its full size — it is laid
+          over the navigation and revealed by a moving clip rather than
+          grown, so the tabs are covered where they stand instead of
+          being pushed anywhere. Out of the tab order while it is shut. */}
       <input
         ref={inputRef}
         className="search-field"

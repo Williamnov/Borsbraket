@@ -98,12 +98,14 @@ export function Masthead() {
           <span className="brand-word">BörsBråket</span>
         </Link>
 
-        {/* The inner div is what gets clipped when the search opens. The
-            nav itself becomes a grid column that animates from 1fr to
-            0fr, which is the only way to slide it shut to its *own*
-            width — animating max-width means guessing a number, and a
-            guess that is too big spends half the animation doing
-            nothing visible. See the note in globals.css. */}
+        {/*
+          The tabs and the search share this box, and the search field is
+          positioned over it rather than beside it — so opening the search
+          covers the tabs instead of pushing them anywhere. Nothing in the
+          masthead changes size or position when it opens, which is the
+          whole point: see the note in globals.css.
+        */}
+        <div className="masthead-mid">
         <nav className="nav">
           <div className="nav-links">
             {LINKS.map((link) => {
@@ -132,9 +134,10 @@ export function Masthead() {
           </div>
         </nav>
 
-        {/* Players only, and it hides itself when there is nobody signed
-            in to search for. */}
-        <Search />
+          {/* Players only, and it hides itself when there is nobody
+              signed in to search for. */}
+          <Search />
+        </div>
 
         {/* Both are always in the markup; CSS shows one. Gating on
             `loading` meant neither appeared until hydration finished. */}
