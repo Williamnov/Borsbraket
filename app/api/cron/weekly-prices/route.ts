@@ -76,11 +76,67 @@ type RoundPlan = {
   gaps: string[];
 };
 
+type InstrumentFields = {
+  symbol?: string;
+  marketCode?: string;
+  currency?: string;
+  isBenchmark?: boolean;
+};
+
+/** getAll takes them all in one call; this is a guard, not a tuned batch. */
+const GETALL_CHUNK = 300;
+
 /**
- * What every open round still needs, without fetching anything.
+ * The instruments a set of rounds actually needs: everything held this
+ * month, plus the benchmarks.
  *
- * Reads are shared across rounds: the instruments collection is fetched
- * once however many months are open at the same time.
+ * This used to be `db.collection("instruments").get()` — the whole
+ * universe, to look up the sixty-odd documents a month's picks refer to.
+ * That is the single largest read in the project by a wide margin and it
+ * happens on a timer whether anyone visits or not: the collection is
+ * past fifteen hundred documents and there are two scheduled runs a day,
+ * so it was spending a few thousand of the Spark plan's fifty thousand
+ * daily reads to discover, most days, that nothing needed writing.
+ *
+ * Fetching the picks first and then asking for those ids by name costs
+ * one read per document returned, and the benchmarks come from a
+ * single-field `where` that bills for the two it finds. Same data, and
+ * the bill now scales with how many stocks are held rather than with
+ * how many exist.
+ */
+async function loadInstruments(
+  db: Db,
+  ids: Set<string>,
+): Promise<Map<string, InstrumentFields>> {
+  const collection = db.collection("instruments");
+  const instruments = new Map<string, InstrumentFields>();
+
+  const benchmarksSnap = await collection.where("isBenchmark", "==", true).get();
+  for (const d of benchmarksSnap.docs) instruments.set(d.id, d.data() as InstrumentFields);
+
+  // The benchmarks are already in hand, so asking for them again would
+  // be paying for them twice.
+  const missing = [...ids].filter((id) => !instruments.has(id));
+
+  for (let i = 0; i < missing.length; i += GETALL_CHUNK) {
+    const refs = missing.slice(i, i + GETALL_CHUNK).map((id) => collection.doc(id));
+    // A pick can name an instrument that has since been removed from the
+    // universe; getAll returns a non-existent snapshot for it, which is
+    // skipped here and reported as an unpriceable symbol downstream.
+    for (const snap of await db.getAll(...refs)) {
+      if (snap.exists) instruments.set(snap.id, snap.data() as InstrumentFields);
+    }
+  }
+
+  return instruments;
+}
+
+/**
+ * What every open round still needs, without fetching any prices.
+ *
+ * Reads are shared across rounds: the picks of every open month are
+ * collected first, so the instruments behind them are looked up once
+ * however many months are open at the same time.
  */
 async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[]> {
   const open = rounds
@@ -89,44 +145,61 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
 
   if (open.length === 0) return [];
 
-  const instrumentsSnap = await db.collection("instruments").get();
-  const instruments = new Map(
-    instrumentsSnap.docs.map((d) => [d.id, { id: d.id, ...(d.data() as Record<string, unknown>) }]),
+  // Pass one: what each open round holds, and what it has already been
+  // priced at. Nothing is resolved to a symbol yet, because the point is
+  // to learn which instruments to ask for before asking for any.
+  const held = await Promise.all(
+    open.map(async (round) => {
+      const checkpoint = currentCheckpoint(round, now);
+      if (checkpoint === null) return null;
+
+      const [picksSnap, pricesSnap] = await Promise.all([
+        db.collection(`rounds/${round.id}/picks`).get(),
+        db.collection(`rounds/${round.id}/prices`).get(),
+      ]);
+
+      const picked = new Set<string>();
+      for (const pickDoc of picksSnap.docs) {
+        for (const id of Object.keys((pickDoc.data().picks ?? {}) as Record<string, unknown>)) {
+          picked.add(id);
+        }
+      }
+
+      return {
+        round,
+        checkpoint,
+        picked,
+        existing: new Map(pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>])),
+      };
+    }),
   );
+
+  const everyPick = new Set<string>();
+  for (const entry of held) {
+    if (entry) for (const id of entry.picked) everyPick.add(id);
+  }
+
+  const instruments = await loadInstruments(db, everyPick);
+  const benchmarkIds = [...instruments]
+    .filter(([, instrument]) => instrument.isBenchmark)
+    .map(([id]) => id);
 
   const plans: RoundPlan[] = [];
 
-  for (const round of open) {
-    const checkpoint = currentCheckpoint(round, now);
-    if (checkpoint === null) continue;
-
-    const [picksSnap, pricesSnap] = await Promise.all([
-      db.collection(`rounds/${round.id}/picks`).get(),
-      db.collection(`rounds/${round.id}/prices`).get(),
-    ]);
+  for (const entry of held) {
+    if (!entry) continue;
+    const { round, checkpoint, existing } = entry;
 
     // Everything held this month, plus the benchmarks.
-    const wanted = new Set<string>();
-    for (const pickDoc of picksSnap.docs) {
-      for (const id of Object.keys((pickDoc.data().picks ?? {}) as Record<string, unknown>)) {
-        wanted.add(id);
-      }
-    }
-    for (const [id, instrument] of instruments) {
-      if ((instrument as { isBenchmark?: boolean }).isBenchmark) wanted.add(id);
-    }
+    const wanted = new Set(entry.picked);
+    for (const id of benchmarkIds) wanted.add(id);
 
-    const existing = new Map(
-      pricesSnap.docs.map((d) => [d.id, d.data() as Record<string, unknown>]),
-    );
     const field = WEEK_FIELDS[checkpoint];
     const requests: PriceRequest[] = [];
     const gaps: string[] = [];
 
     for (const id of wanted) {
-      const instrument = instruments.get(id) as
-        | { symbol?: string; marketCode?: string; currency?: string; isBenchmark?: boolean }
-        | undefined;
+      const instrument = instruments.get(id);
       if (!instrument?.symbol) continue;
 
       const current = existing.get(id);
