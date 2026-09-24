@@ -60,6 +60,22 @@ looked like success:
 
 ## Next steps, in order
 
+0. **`firebase deploy --only firestore:rules`, before anything else touches Firestore.**
+
+   The deployed rules still require `isBenchmark == false` on every instrument a pick names. The
+   field is no longer written, and a rules expression naming a field the document does not have
+   fails the whole write — so the first seed against the old rules makes **every newly seeded
+   instrument unpickable**, with the denial arriving as a bare PERMISSION_DENIED in a player's
+   browser. Existing documents still carry the field, which is why nothing is broken yet.
+
+   This is an ordering constraint, not a suggestion: step 1 is the thing that breaks.
+
+   Then, in **Admin → The month**, put September and October onto the new schedule. Select the
+   month, press **Use the standard schedule**, check what it proposes in the notice, and save.
+   Rounds carry their own dates, so the code change did nothing to the ones already in Firestore.
+   September should end Monday 28 September; October should open Monday 28 September, seal
+   Wednesday 30 September and end Monday 26 October.
+
 1. **`npm run seed`**, and this time it matters more than usual. The universe in the code is a long
    way ahead of Firestore: **1,986 instruments across 37 markets**, of which 1,643 are the Nordic
    lists taken straight from the exchanges on 2026-09-24. Firestore has the 450 from 2026-09-22.
@@ -196,6 +212,16 @@ The code is correct and the symbols are right; the address is the problem. So th
   those are Nasdaq's own now — but does mean the league cannot filter on company size. The
   `minMarketCapMusd` setting exists and has nothing to compare against. Nasdaq's US screener carries
   the number; see the branch note above.
+- **The three point values are unconfirmed.** 10 for the best portfolio, 5 for its best single
+  stock, 2 for finishing up. The brief was "most / some / a little" with no numbers attached, so
+  these are a first pass rather than a decision — worth playing a month on before treating them as
+  settled. They are one object at the top of `lib/scoring.ts` and nothing else hard-codes a point
+  value; the rules page and the league page both read them.
+
+  Worth thinking about at the same time: with three awards and a handful of players, the best
+  portfolio takes 17 of a possible 17 in a good month while everyone who finished up takes 2. That
+  spread is wider than the old podium's, which may be exactly right for a league this size or may
+  make the season table a foregone conclusion by March.
 - **`w0` changed meaning.** It is now the price at the lock, not the price at the start of the
   month — measuring from the 1st handed whoever submitted last three days of hindsight. Any prices
   recorded before this change still carry the old meaning. There were no settled months at the time,
