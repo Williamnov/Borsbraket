@@ -4,6 +4,23 @@ Where the project stands, so you can pick it up without re-reading anything.
 
 Last updated: 2026-09-24
 
+## Changed on 2026-09-24, and not yet seen in production
+
+Three things about how the league works, rather than how it looks:
+
+- **The schedule moved.** Picking for a month now happens in the last week of the month before —
+  opens on its last Monday, seals on its last weekday — and the round runs through the month to
+  its own last Monday. It used to open on the 1st and lock on the 4th, leaving the first three
+  trading days unmeasured. `defaultRoundShape` in `lib/scoring.ts` is the definition; the admin
+  panel's **Open next month** uses it, and **rounds already in Firestore keep the dates they were
+  created with** until somebody edits them.
+- **The points are three awards**, not a six-deep podium: 10 for the best portfolio of the month,
+  5 for holding its best single stock, 2 for finishing up. See the block above `POINTS` in
+  `lib/scoring.ts` for why each one behaves the way it does around zero.
+- **Benchmarks are gone.** OMXS30 and the S&P 500 are out of the universe, the price job, the
+  fetcher and both tables that showed them. The instrument documents for them are still in
+  Firestore, marked ineligible, and nothing reads them.
+
 ## State
 
 Deployed and running. CI builds it, typechecks it and runs both test suites on every push, and
@@ -16,7 +33,8 @@ looked like success:
 - **The CSP blanked the site.** A nonce-based policy compiled, built, deployed and served 200s with
   every inline script blocked. Every page here is prerendered, and Next only stamps nonces onto
   pages it renders per request, so the HTML went out with no nonce while the middleware attached a
-  fresh one to each response. React booted with no hydration payload and cleared the DOM. The
+  fresh one to each response. (The policy is a static header in `next.config.mjs` now, and the
+  middleware is gone with it.) React booted with no hydration payload and cleared the DOM. The
   policy no longer uses a nonce and ships report-only; `scripts/smoke.mjs` asserts the header and
   the HTML agree so it cannot recur unnoticed.
 - **The Firestore free quota ran out.** 54,786 reads in a day against a 50,000 limit, from one
@@ -195,9 +213,9 @@ The code is correct and the symbols are right; the address is the problem. So th
   is: settle a month, then build it, then verify the two agree before the recomputation is removed.
 - **The universe is 1,986 instruments now**, up from 450, and four times the ~300 that exhausted the
   daily read quota once. That is survivable only because no player-facing page reads the collection
-  any more: `/month` loads one market at a time or queries a prefix, `/history` asks for
-  `isBenchmark` and gets two documents, and the picks carry their own symbols and names so no table
-  needs the universe at all.
+  any more: `/month` loads one market at a time or queries a prefix, and the picks carry their own
+  symbols and names so no table needs the universe at all. The weekly price job asks for the sixty
+  or so documents this month's picks name, by id.
 
   **The admin page is the exception** — it subscribes to all of it, and that is now a two-thousand
   document read on a cold cache. One person opens it, rarely, and the cache is persistent, so it is
@@ -221,7 +239,7 @@ The code is correct and the symbols are right; the address is the problem. So th
   the app reads only your own picks document while a round is open: listing the collection is
   refused by the rules, deliberately.
 - The CSP carries no nonce, and that is not an oversight. See the note at the top of
-  [`middleware.ts`](middleware.ts) before adding one back.
+  [`next.config.mjs`](next.config.mjs) before adding one back.
 - Prices are fetched from GitHub Actions rather than a Vercel cron, because a failed workflow emails
   you and a Vercel cron that stops running tells nobody.
 - **Twelve Data cannot price this league.** Its free tier is US equities, forex and crypto; every

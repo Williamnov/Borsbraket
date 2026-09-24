@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700" role="img"
+     aria-label="The BörsBråket landing page: a navy-to-white gradient with the headline Five stocks. One month. One table.">
+  <!--
+    A drawing of the landing page, not a capture of it.
+
+    Every colour, size and word here is taken from app/globals.css and
+    app/(home)/page.tsx, so it is accurate rather than imagined — but it
+    is hand-built, and it will drift if the page changes and this does
+    not. Replacing it with a real screenshot is a one-line change in the
+    README.
+
+    The headline face is Plus Jakarta Sans, which a README viewer will
+    not have; the stack below falls back to whatever system sans is
+    available, so the shapes are close and the layout is exact.
+  -->
+  <defs>
+    <linearGradient id="sky" x1="0.08" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#10294a"/>
+      <stop offset="20%" stop-color="#17355a"/>
+      <stop offset="40%" stop-color="#24496f"/>
+      <stop offset="55%" stop-color="#3d6690"/>
+      <stop offset="68%" stop-color="#7d9dbe"/>
+      <stop offset="80%" stop-color="#c2d2e2"/>
+      <stop offset="90%" stop-color="#eef3f8"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+
+    <radialGradient id="glow" cx="0.84" cy="-0.14" r="0.9">
+      <stop offset="0%" stop-color="#a7c4df" stop-opacity="0.5"/>
+      <stop offset="70%" stop-color="#a7c4df" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="shade" cx="0" cy="-0.08" r="0.7">
+      <stop offset="0%" stop-color="#051226" stop-opacity="0.72"/>
+      <stop offset="65%" stop-color="#051226" stop-opacity="0"/>
+    </radialGradient>
+
+    <linearGradient id="accentline" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#d6e6f6"/>
+      <stop offset="100%" stop-color="#8fb6dd"/>
+    </linearGradient>
+
+    <style>
+      .sans { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+      .body { font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="700" fill="url(#sky)"/>
+  <rect width="1200" height="700" fill="url(#shade)"/>
+  <rect width="1200" height="700" fill="url(#glow)"/>
+
+  <!-- ── Masthead: transparent over the navy, light type ─────────── -->
+  <g transform="translate(56 20)">
+    <g fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linejoin="round" stroke-linecap="round"
+       transform="scale(0.27)">
+      <path d="M7.5 33 L26 55 H74 L92.5 33"/>
+      <rect x="11.45" y="23.45" width="19.09" height="19.09" rx="3" transform="rotate(45 21 33)"/>
+      <rect x="38.69" y="12.69" width="22.63" height="22.63" rx="3" transform="rotate(45 50 24)"/>
+      <rect x="69.45" y="23.45" width="19.09" height="19.09" rx="3" transform="rotate(45 79 33)"/>
+      <path d="M23 63 H77"/>
+    </g>
+    <text x="37" y="16" class="sans" font-size="18" font-weight="600" fill="#ffffff"
+          letter-spacing="-0.4">BörsBråket</text>
+  </g>
+
+  <g class="body" font-size="14" font-weight="500" fill="#ffffff" fill-opacity="0.74">
+    <text x="640" y="36">How it works</text>
+  </g>
+
+  <g transform="translate(1024 18)">
+    <rect width="120" height="36" rx="18" fill="#ffffff"/>
+    <text x="60" y="23" class="body" font-size="14" font-weight="600" fill="#1b3a6b"
+          text-anchor="middle">Sign in</text>
+  </g>
+
+  <!-- ── Hero ────────────────────────────────────────────────────── -->
+  <g class="sans" font-size="58" font-weight="800" letter-spacing="-2.4">
+    <text x="56" y="200" fill="#ffffff">Five stocks.</text>
+    <text x="56" y="262" fill="#ffffff">One month.</text>
+    <text x="56" y="324" fill="url(#accentline)">One table.</text>
+  </g>
+
+  <g class="body" font-size="17" fill="#ffffff" fill-opacity="0.76">
+    <text x="56" y="376">A private stock-picking league. Everyone picks up to five stocks in the last</text>
+    <text x="56" y="402">week of the month, prices are checked once a week through the month that</text>
+    <text x="56" y="428">follows, and the best portfolio takes the points.</text>
+  </g>
+
+  <g transform="translate(56 466)">
+    <rect width="176" height="48" rx="24" fill="#ffffff"/>
+    <text x="88" y="30" class="body" font-size="15" font-weight="600" fill="#1b3a6b"
+          text-anchor="middle">Sign in to play</text>
+
+    <rect x="188" width="168" height="48" rx="24" fill="#ffffff" fill-opacity="0.09"
+          stroke="#ffffff" stroke-opacity="0.32"/>
+    <text x="272" y="30" class="body" font-size="15" font-weight="600" fill="#ffffff"
+          fill-opacity="0.92" text-anchor="middle">Read the rules</text>
+  </g>
+
+  <!-- ── The three figures, on glass across the join ─────────────── -->
+  <g transform="translate(56 560)">
+    <g>
+      <rect width="357" height="116" rx="16" fill="#ffffff" fill-opacity="0.82"
+            stroke="#ffffff" stroke-opacity="0.85"/>
+      <text x="24" y="54" class="sans" font-size="40" font-weight="800" fill="#1b3a6b"
+            letter-spacing="-1.6">5</text>
+      <text x="24" y="80" class="sans" font-size="15" font-weight="700" fill="#0f172a">stocks a month</text>
+      <text x="24" y="101" class="body" font-size="13.5" fill="#64748b">Equal weight, no sizing</text>
+    </g>
+
+    <g transform="translate(374 0)">
+      <rect width="357" height="116" rx="16" fill="#ffffff" fill-opacity="0.82"
+            stroke="#ffffff" stroke-opacity="0.85"/>
+      <text x="24" y="54" class="sans" font-size="40" font-weight="800" fill="#1b3a6b"
+            letter-spacing="-1.6">4</text>
+      <text x="24" y="80" class="sans" font-size="15" font-weight="700" fill="#0f172a">checkpoints</text>
+      <text x="24" y="101" class="body" font-size="13.5" fill="#64748b">One price every week</text>
+    </g>
+
+    <g transform="translate(748 0)">
+      <rect width="340" height="116" rx="16" fill="#ffffff" fill-opacity="0.82"
+            stroke="#ffffff" stroke-opacity="0.85"/>
+      <text x="24" y="54" class="sans" font-size="40" font-weight="800" fill="#1b3a6b"
+            letter-spacing="-1.6">17</text>
+      <text x="24" y="80" class="sans" font-size="15" font-weight="700" fill="#0f172a">points at stake</text>
+      <text x="24" y="101" class="body" font-size="13.5" fill="#64748b">Three ways to score</text>
+    </g>
+  </g>
+</svg>

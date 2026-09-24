@@ -1,57 +1,85 @@
+<div align="center">
+
 # BörsBråket
 
-A monthly stock-picking league for a group of friends.
+**A private monthly stock-picking league.**
+Five stocks, sealed until the month locks, scored against the other players.
 
-Everyone picks up to five stocks at the start of the month. Nobody sees anyone else's picks until
-the month locks. Prices are recorded weekly from there, and the month's return decides who takes the
-points.
+[**borsbraket.vercel.app**](https://borsbraket.vercel.app) &nbsp;·&nbsp;
+[The rules](https://borsbraket.vercel.app/instructions) &nbsp;·&nbsp;
+[Setup](SETUP.md) &nbsp;·&nbsp;
+[Status](STATUS.md)
 
-**[borsbraket.vercel.app](https://borsbraket.vercel.app)** — the site is public, the league is
-invite-only. Anyone can sign in; an admin approves the account before it can see or do anything.
+<img src="docs/preview.svg" alt="The BörsBråket landing page" width="820">
+
+</div>
 
 ---
 
 ## How a month works
 
+Picking for a month happens in the **last week of the month before**. It opens on that month's
+last Monday, seals on its last weekday, and the round then runs through the month itself to its
+own last Monday — at which point the next month's picking week begins. One round's last day is the
+next one's first.
+
 | | |
 |---|---|
-| **Five stocks** | Equal weight, one entry per ticker |
-| **Picks lock** | A few days into the month. After that, nothing moves |
-| **Sealed** | Other players' picks are not sent to your browser at all while the month is open |
-| **Four checkpoints** | Prices weekly, measured from a baseline taken *at the lock* |
-| **Points** | 10 / 7 / 5 / 4 / 3 / 2, then 1 for everyone else who submitted |
+| **Up to five stocks** | Equal weight, one entry per ticker |
+| **Sealed** | Other players' picks are never sent to your browser while the month is open |
+| **Baseline at the lock** | Not the 1st — see below |
+| **Four checkpoints** | A price every seven days, and a last one when the month closes |
 
 Measuring from the lock rather than the 1st is deliberate. If the baseline were the month's opening
-price, whoever submitted last would have seen three days of trading and could pick something that
-had already moved. Sealing and measuring at the same instant gives everyone one starting price.
+price, whoever submitted last would have seen days of trading and could pick something that had
+already moved. Sealing and measuring at the same instant gives everyone one starting price.
 
-**Where you can pick from:** every Nordic list — Large, Mid and Small Cap and First North in
-Stockholm, Helsinki, Copenhagen and Reykjavík, Spotlight and NGM's two markets beside them, and Oslo
-Børs with Euronext Expand and Growth — plus the main North American and UK markets, the large
-continental European venues (Xetra, Paris, SIX, Amsterdam, Madrid, Milan), and Tokyo and Sydney.
+### Points
 
-The Nordic half of that is not maintained by hand. Each of those exchanges publishes its own current
+Three awards, and one player can take all three:
+
+| | |
+|---|---|
+| **10** | The best portfolio of the month |
+| **5** | Holding the month's best single stock |
+| **2** | Finishing the month up |
+
+Beating everyone always pays, even in a month where everyone is down: −1% against −2% is still the
+best portfolio in the league. The single-stock award is the one with a floor — a stock that fell is
+not the month's best call, however much less it fell than the rest. Down and beaten pays nothing.
+
+There is no index to beat. The only thing you are measured against is what the other players
+picked.
+
+### Where you can pick from
+
+Every Nordic list — Large, Mid and Small Cap and First North in Stockholm, Helsinki, Copenhagen and
+Reykjavík, Spotlight and NGM's two markets beside them, Oslo Børs with Euronext Expand and Growth —
+plus the main North American and UK markets, the large continental European venues (Xetra, Paris,
+SIX, Amsterdam, Madrid, Milan), and Tokyo and Sydney.
+
+The Nordic half is not maintained by hand. Each of those exchanges publishes its own current
 listing, segment by segment, and `scripts/build-universe.mjs` takes it from them — so Mid Cap means
 what Nasdaq says it means this year, and nothing is typed, matched or guessed at.
 
 **Finding a stock** works two ways, and the difference is a read cost rather than a preference.
 Choose a market and the picker loads that market, so the search box filters a list already in your
-browser and matches anywhere in a name. Choose **All markets** and it loads nothing at all: what you
-type goes to the server, which returns the handful of documents that match. That costs a few reads
-per search instead of the whole universe per visit — which matters, because subscribing to the whole
+browser and matches anywhere in a name. Choose **All markets** and it loads nothing: what you type
+goes to the server, which returns the handful of documents that match. That costs a few reads per
+search instead of the whole universe per visit — which matters, because subscribing to the whole
 `instruments` collection is the read that exhausted the daily quota once already. The trade is that
 All markets matches the *beginning* of a name or ticker: "volvo" finds Volvo, "olvo" finds nothing.
 
-The full rules live at `/instructions` in the running app.
-
 ## What's in it
 
-- **League table** — season standings, compounded return, sortable on every column
-- **The month** — your picks, who has submitted, live returns once the month locks
-- **History** — every settled month, each holding, and a record book
-- **Message board** — rate-limited, and a posted message can never be edited, by anyone
-- **Player pages** — a profile and a season history for everyone in the league
-- **Admin** — approvals, opening and settling months, the price grid, the instrument universe
+| | |
+|---|---|
+| **League** | Season standings, compounded return, sortable on every column |
+| **Picks** | Your picks, who has submitted, live returns once the month locks |
+| **History** | Every settled month, each holding, and a record book |
+| **Chat** | Rate-limited, and a posted message can never be edited, by anyone |
+| **Players** | A profile and a season history for everyone in the league |
+| **Admin** | Approvals, running the month, the price grid, the instrument universe |
 
 ## Built with
 
@@ -86,10 +114,10 @@ Refreshing the Nordic universe — worth doing when the exchanges reshuffle thei
 Nasdaq does once a year:
 
 ```bash
-npm run universe                           # ask the exchanges, report, change nothing
-npm run universe -- --write                # rewrite lib/universe.generated.ts
-npm run seed                               # and put it in Firestore
-npm run seed -- --retire                   # ...including retiring what is no longer listed
+npm run universe              # ask the exchanges, report, change nothing
+npm run universe -- --write   # rewrite lib/universe.generated.ts
+npm run seed                  # and put it in Firestore
+npm run seed -- --retire      # ...including retiring what is no longer listed
 ```
 
 Read the report before writing. It names what moved between segments, what was renamed and what has
@@ -111,4 +139,6 @@ own.
 
 ---
 
-*Picking this up after a break? [STATUS.md](STATUS.md) has the current state and the open questions.*
+<div align="center">
+<sub>Picking this up after a break? <a href="STATUS.md">STATUS.md</a> has the current state and the open questions.</sub>
+</div>

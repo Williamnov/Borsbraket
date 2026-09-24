@@ -68,7 +68,8 @@ Your address is passed on the command line rather than stored in the repository.
 
 From the **Admin** page:
 
-1. **Open next month** — creates the round with sensible dates (opens on the 1st, locks on the 4th).
+1. **Open next month** — creates the round on the standard schedule: picking opens on the last
+   Monday of the month before and seals on its last weekday.
 2. Players submit picks before the lock.
 3. The **baseline** is recorded on the first run at or after the lock. Each column in the price grid
    carries the date it is due, so entering one by hand means the same thing the job means by it.
@@ -96,12 +97,12 @@ options. Running the same script from an ordinary machine works, and the admin g
 ## How the data is arranged
 
 ```
-profiles/{uid}                          status, isAdmin, handle, alias, description, icon, photo
+profiles/{uid}                          status, isAdmin, handle, alias, description, photo
 contacts/{uid}                          the sign-in address — owner and admins only
 rateLimits/{uid}                        how fast one player may post
 chat/{messageId}                        the message board
 markets/{code}                          the pickable lists
-instruments/{marketCode_SYMBOL}         symbol, name, currency, eligible, isBenchmark
+instruments/{marketCode_SYMBOL}         symbol, name, currency, eligible
 settings/league                         league-wide settings
 rounds/{YYYY-MM}                        dates, picksPerRound, status
 rounds/{YYYY-MM}/picks/{uid}            picks — sealed until the lock
@@ -138,8 +139,9 @@ A few decisions worth knowing before changing them:
   the replies. Authors and admins can delete.
 - **The admin panel** is hidden from the navigation and redirects non-admins, but the control is
   `isAdmin()` on every admin write in the rules. The first two are convenience.
-- **A Content-Security-Policy** is set in [`middleware.ts`](middleware.ts), currently report-only.
-  It carries no nonce, deliberately — read the note at the top of that file before adding one back.
+- **A Content-Security-Policy** is set in [`next.config.mjs`](next.config.mjs), currently
+  report-only. It carries no nonce, deliberately — read the note at the top of that file before
+  adding one back.
 - **Profile pictures** are resized in the browser to 192px and stored on the profile document, since
   Cloud Storage needs a billing account. The rules cap each one.
 
