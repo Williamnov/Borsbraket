@@ -124,6 +124,16 @@ function MonthView() {
   );
 
 
+  // Who is in, while the month is still open. Derived rather than
+  // filtered in the markup so the empty case has something to test.
+  const submitted = useMemo(
+    () =>
+      profiles
+        .map((p) => ({ profile: p, count: submissions.get(p.uid) ?? 0 }))
+        .filter((row) => row.count > 0),
+    [profiles, submissions],
+  );
+
   const { sortBy, direction, onSort } = useColumnSort<EntrySort>("rank", ASC_FIRST);
 
   const standings = useMemo(
@@ -215,19 +225,20 @@ function MonthView() {
               <p className="hint">
                 Sealed until the lock — you can see who has submitted, not what they chose.
               </p>
-              {profiles.map((p) => {
-                const count = submissions.get(p.uid);
-                return (
+              {/* Only the players who are in. A list of everyone with
+                  "Waiting" beside most of them is a list of who has not
+                  done their homework, which is a different panel from
+                  the one this is titled. */}
+              {submitted.length === 0 ? (
+                <p className="hint">Nobody has picked yet. Go first.</p>
+              ) : (
+                submitted.map(({ profile: p, count }) => (
                   <div key={p.uid} className="row" style={{ justifyContent: "space-between" }}>
                     <PlayerCell profile={p} you={p.uid === profile?.uid} />
-                    {/* A pill rather than grey text: at a glance this
-                        column should read as a list of who is ready. */}
-                    <span className={count ? "pill open" : "pill settled"}>
-                      {count ? `${count} picked` : "Waiting"}
-                    </span>
+                    <span className="pill open">{count} picked</span>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
           ) : entries.length === 0 ? (
             <Empty>Nobody submitted picks this month.</Empty>
