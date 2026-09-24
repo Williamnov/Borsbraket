@@ -33,6 +33,25 @@ export function Masthead() {
   const { profile, canPlay, signOut } = useAuth();
   const [lifted, setLifted] = useState(false);
   const [hidden, setHidden] = useState(false);
+  // Starts true so the server's HTML and the first client render agree:
+  // the top of the home page is where everyone begins.
+  const [overHero, setOverHero] = useState(true);
+  /**
+   * Whether the first scroll measurement has had time to land.
+   *
+   * It exists to keep the bar's colour transition switched off until it
+   * has. Reload the landing page half-way down and the server's markup
+   * says "over the hero" — light type, no fill — while the browser has
+   * already restored the scroll position to somewhere white. The effect
+   * below corrects that on the first frame after paint, but with the
+   * transition live the correction is a third of a second of white text
+   * fading in on a white bar. Off, it is one frame.
+   *
+   * A timer rather than a rAF because the point is to be safely after
+   * the correcting render, not exactly one frame after it, and 60ms of
+   * instant colour changes at page load is not something anyone can see.
+   */
+  const [settled, setSettled] = useState(false);
 
   // Only for players, and only away from the board itself — standing on
   // the page is what clears the mark, so a badge there would be a count
@@ -55,12 +74,21 @@ export function Masthead() {
    * upward scroll at all brings it straight back, which is what someone
    * reaching for the nav is already doing.
    *
+   * It also tracks whether the bar is still over the dark end of the
+   * landing page's sky, which is what decides between the white glass
+   * treatment and the light-on-navy one. HERO_DEPTH is a plain constant
+   * rather than a measurement of the gradient: the sky is 900px tall and
+   * has gone pale well before half of it, so anything in that region is
+   * right, and measuring would mean reading layout on every frame to
+   * settle a question that only has two answers.
+   *
    * The reads are batched into a rAF because scroll fires far more often
    * than the screen repaints, and touching scrollY forces layout.
    */
   useEffect(() => {
     const REVEAL_AT = 140;
     const DEADBAND = 6;
+    const HERO_DEPTH = 180;
     let last = window.scrollY;
     let frame = 0;
 
@@ -69,6 +97,7 @@ export function Masthead() {
       const y = window.scrollY;
       const delta = y - last;
       setLifted(y > 4);
+      setOverHero(y < HERO_DEPTH);
 
       if (Math.abs(delta) > DEADBAND) {
         setHidden(delta > 0 && y > REVEAL_AT);
@@ -81,16 +110,23 @@ export function Masthead() {
     };
 
     measure();
+    const settle = window.setTimeout(() => setSettled(true), 60);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
+      window.clearTimeout(settle);
       if (frame !== 0) window.cancelAnimationFrame(frame);
     };
   }, []);
 
+  // Only the landing page has anything dark behind the bar to match.
+  const onHero = pathname === "/" && overHero;
+
   return (
     <header
-      className={`masthead${lifted ? " is-lifted" : ""}${hidden ? " is-hidden" : ""}`}
+      className={`masthead${lifted && !onHero ? " is-lifted" : ""}${
+        hidden ? " is-hidden" : ""
+      }${onHero ? " is-over-hero" : ""}${settled ? " is-settled" : ""}`}
     >
       <div className="masthead-inner">
         <Link href="/" className="brand">

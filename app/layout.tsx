@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Inter, Poppins, Source_Serif_4 } from "next/font/google";
+import { IBM_Plex_Mono, Inter, Plus_Jakarta_Sans, Poppins } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
+import { Backdrop } from "@/components/Backdrop";
 import { LeagueProvider } from "@/components/LeagueProvider";
 import { Masthead } from "@/components/Masthead";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -13,20 +14,26 @@ const sans = Inter({
 });
 
 /**
- * Headings, in a serif.
+ * Headings.
  *
- * This is the one decision that does most of the work in making the page
- * read as research rather than as an app. Everything else here — the
- * slate palette, the square corners, the wide-tracked labels — is
- * quiet; a serif headline over a table of numbers is not, and it is what
- * the eye recognises.
+ * This was Source Serif 4, and the serif was doing a lot of work: it made
+ * a page of returns read as a research note rather than as an app. It
+ * also made it read as a printed one. The brief now is clean rather than
+ * bookish, so the headline face is a sans again.
  *
- * Source Serif 4 rather than a display serif on purpose: it was drawn
- * for screen text, so it holds up at 16px in a panel header as well as
- * at 29px in a page title.
+ * Plus Jakarta Sans rather than another grotesque, for two reasons. Its
+ * bowls are close to circular, which is what the crown in the masthead is
+ * built from, so a headline under the logo looks related to it. And it
+ * has enough character at 40px — the flat-sided g, the open apertures —
+ * to carry a hero on its own, which Inter, set large, does not.
+ *
+ * Inter still sets everything below heading size. It is the better face
+ * at 13px in a table, and the two are near enough in proportion that the
+ * switch between them is not something you notice.
  */
-const display = Source_Serif_4({
+const display = Plus_Jakarta_Sans({
   subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
   display: "swap",
   variable: "--font-display-face",
 });
@@ -108,6 +115,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* One set of Firestore listeners for the whole session, rather
               than five per page. See components/LeagueProvider.tsx. */}
           <LeagueProvider>
+            {/* The landing page's sky. Out of flow and behind everything,
+                so it can run up under the masthead — which is why it is
+                here and not in the page. */}
+            <Backdrop />
             <Masthead />
             <main className="shell">{children}</main>
             <SiteFooter />

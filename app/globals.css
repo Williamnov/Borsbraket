@@ -1,14 +1,16 @@
-/* ═══ BörsBråket — white, quiet, built for reading numbers ═══════════ */
+/* ═══ BörsBråket — light, open, built for reading numbers ════════════ */
 
 /*
- * The palette and the shapes are the institutional-research look: slate
- * neutrals, one deep navy, and corners that are nearly square. It reads
- * as a research note rather than a product, which is the right register
- * for a page of returns.
+ * Slate neutrals and one deep navy, the same palette as before. What
+ * changed is the geometry: the corners were 2px and everything was
+ * drawn as a box with a line around it, which read as a printed research
+ * note. Now the radii are generous, the hairlines are lighter, and the
+ * separation between one thing and the next is mostly soft shadow and
+ * space rather than a rule.
  *
  * Everything below is a token, and almost nothing in this file sets a
  * colour or a radius any other way — so the whole look turns on this
- * block. Retarget these thirty lines and the rest follows.
+ * block. Retarget these forty lines and the rest follows.
  */
 :root {
   color-scheme: light;
@@ -22,8 +24,11 @@
   --ink-2: #475569;
   --ink-3: #64748b;
 
-  --line: #e2e8f0;
-  --line-strong: #cbd5e1;
+  /* Lighter than they were. A hairline that you have to look for is
+     doing the right amount of work once there is a shadow under the
+     panel as well. */
+  --line: #e9eef4;
+  --line-strong: #d3dce7;
 
   /*
    * Navy, not the reference's red.
@@ -47,10 +52,18 @@
   --silver: #64748b;
   --bronze: #92400e;
 
-  /* Near-square. 2px is enough to stop the corners looking accidental
-     and not enough to read as a rounded interface. */
-  --radius: 2px;
-  --radius-sm: 2px;
+  /*
+   * Three radii and nothing else.
+   *
+   * --radius is for anything that holds content: panels, notices, the
+   * search drop. --radius-sm is for the things inside them. --radius-pill
+   * is for anything whose shape is its own — buttons, status pills,
+   * tickers, chips — and it is what stops the page reading as a stack of
+   * rectangles now that the boxes themselves are quieter.
+   */
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
 
   /* One spacing scale, so nothing is spaced by eye. */
   --s1: 4px;
@@ -60,12 +73,22 @@
   --s5: 24px;
   --s6: 32px;
   --s7: 48px;
+  --s8: 72px;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* Soft and wide rather than tight and dark: the shadow is what
+     separates a panel from the page now that the border barely does. */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.03), 0 8px 24px -16px rgba(15, 23, 42, 0.18);
   /* For the one or two things that should lift off the page — a panel
      under the cursor, the masthead once it has something scrolled under
      it. A long, very soft drop rather than a halo. */
-  --shadow-lift: 0 1px 2px rgba(15, 23, 42, 0.04), 0 12px 28px -18px rgba(15, 23, 42, 0.25);
+  --shadow-lift: 0 1px 2px rgba(15, 23, 42, 0.04), 0 18px 40px -22px rgba(15, 23, 42, 0.28);
+  --shadow-float: 0 2px 4px rgba(15, 23, 42, 0.04), 0 28px 60px -28px rgba(15, 23, 42, 0.34);
+
+  /* The one easing the whole page moves on, and two durations. Naming
+     them keeps a hundred hand-written cubic-beziers from drifting apart. */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --quick: 0.18s;
+  --settle: 0.42s;
 
   /* Tracking, for the small uppercase labels that carry this look. */
   --tracking-wide: 0.08em;
@@ -77,7 +100,7 @@
   /* next/font injects --font-sans-face / --font-display-face / --font-mono-face
      on <html>. The fallbacks keep the page readable if a face fails to load. */
   --font-body: var(--font-sans-face, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-display-face, ui-serif), Georgia, "Times New Roman", serif;
+  --font-display: var(--font-display-face, ui-sans-serif), system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-brand: var(--font-brand-face, ui-sans-serif), system-ui, sans-serif;
   --font-mono: var(--font-mono-face, ui-monospace), "SFMono-Regular", Menlo, monospace;
 }
@@ -92,12 +115,24 @@ body {
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
 body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 15.5px;
+  line-height: 1.62;
+  /* Inter's contextual alternates, and its slashed-zero-adjacent shapes
+     turned off in running text — the numbers that matter are all in the
+     mono face, which sets its own. */
+  font-feature-settings: "cv05" 1, "cv11" 1;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 
@@ -106,6 +141,10 @@ body {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+
+  /* The landing page's sky is an absolute child of the body, so the body
+     has to be what it is absolute to. */
+  position: relative;
 }
 
 h1,
@@ -113,15 +152,17 @@ h2,
 h3,
 h4 {
   font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.018em;
+  font-weight: 700;
+  /* Tighter than the old serif wanted. A geometric sans at heading size
+     is loose by default and reads as a logo until it is pulled in. */
+  letter-spacing: -0.03em;
   margin: 0;
   text-wrap: balance;
 }
 
-h1 { font-size: 29px; line-height: 1.18; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
+h1 { font-size: 32px; line-height: 1.12; }
+h2 { font-size: 21px; line-height: 1.25; letter-spacing: -0.024em; }
+h3 { font-size: 16.5px; line-height: 1.35; letter-spacing: -0.018em; }
 
 p { margin: 0; }
 
@@ -154,8 +195,12 @@ a:hover { text-decoration: underline; }
   max-width: 1040px;
   margin: 0 auto;
   padding-inline: var(--s5);
-  padding-block: 0 var(--s7);
+  padding-block: 0 var(--s8);
   flex: 1 0 auto;
+  /* Above the landing page's sky, which is an out-of-flow sibling
+     underneath it. Harmless everywhere else. */
+  position: relative;
+  z-index: 1;
 }
 
 .stack {
@@ -207,18 +252,92 @@ a:hover { text-decoration: underline; }
   top: 0;
   z-index: 20;
   border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: saturate(160%) blur(10px);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: saturate(170%) blur(14px);
   transition:
-    box-shadow 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow 0.28s ease,
+    border-color 0.28s ease,
+    background 0.28s ease,
+    transform 0.28s var(--ease);
 }
+
+/* The bar's first frame is drawn before anything has measured where the
+   page is scrolled to, so its first correction should be instant rather
+   than a fade from the wrong colours. See components/Masthead.tsx. */
+.masthead:not(.is-settled) { transition: none; }
 
 /* Set by the masthead itself once the page has scrolled under it. */
 .masthead.is-lifted {
   box-shadow: var(--shadow-lift);
-  border-color: var(--line-strong);
+  border-color: var(--line);
+}
+
+/* ── The masthead over the landing page's sky ──────────────────────────
+   At the top of the home page there is no white behind the bar, there is
+   navy, so the bar takes the navy's side: no fill, no rule, and light
+   type. The class comes off as soon as the page has scrolled far enough
+   that the sky under the bar has gone pale, and the transitions above
+   carry it across rather than snapping. See components/Masthead.tsx. */
+
+.masthead.is-over-hero {
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
+.masthead.is-over-hero .brand,
+.masthead.is-over-hero .brand-mark {
+  color: #ffffff;
+}
+
+.masthead.is-over-hero .nav a,
+.masthead.is-over-hero .search-trigger {
+  color: rgba(255, 255, 255, 0.74);
+}
+.masthead.is-over-hero .nav a:hover,
+.masthead.is-over-hero .search-trigger:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.14);
+}
+.masthead.is-over-hero .nav a[aria-current="page"] { color: #ffffff; }
+.masthead.is-over-hero .nav a::after { background: #ffffff; }
+
+.masthead.is-over-hero .nav-divider { background: rgba(255, 255, 255, 0.28); }
+
+/* White on navy, which is the strongest a button gets — and the right
+   weight for the one thing a signed-out visitor is here to do. */
+.masthead.is-over-hero .button.primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--accent);
+  box-shadow: 0 6px 20px -10px rgba(2, 12, 28, 0.7);
+}
+.masthead.is-over-hero .button.primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.9);
+}
+
+.masthead.is-over-hero button.signout {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: rgba(255, 255, 255, 0.82);
+}
+.masthead.is-over-hero button.signout:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #ffffff;
+}
+
+.masthead.is-over-hero .search-field {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff;
+}
+.masthead.is-over-hero .search-field::placeholder { color: rgba(255, 255, 255, 0.6); }
+
+.masthead.is-over-hero :where(a, button, input):focus-visible {
+  outline-color: #ffffff;
 }
 
 /* Out of the way while reading down a long table, back on the first
@@ -333,11 +452,13 @@ a:hover { text-decoration: underline; }
    quieter, and it lines up with the masthead border. */
 .nav a {
   position: relative;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  padding: 6px 11px;
+  border-radius: var(--radius-pill);
   color: var(--ink-2);
   font-size: 14px;
   font-weight: 500;
+  letter-spacing: -0.008em;
+  transition: color var(--quick) ease, background var(--quick) ease;
 }
 .nav a:hover {
   color: var(--ink);
@@ -351,8 +472,8 @@ a:hover { text-decoration: underline; }
 .nav a::after {
   content: "";
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 11px;
+  right: 11px;
   bottom: -13px;
   height: 2px;
   border-radius: 2px;
@@ -445,12 +566,14 @@ html[data-player="1"] .cta-guest { display: none; }
 }
 
 .page-head {
-  padding-block: var(--s6) var(--s2);
+  padding-block: var(--s7) var(--s3);
 }
+.page-head h1 { font-size: 34px; }
 .page-head p {
   color: var(--ink-2);
-  margin-top: 6px;
+  margin-top: 10px;
   max-width: 62ch;
+  font-size: 16px;
 }
 
 /* ── Panels ────────────────────────────────────────────────────────── */
@@ -463,9 +586,15 @@ html[data-player="1"] .cta-guest { display: none; }
   overflow: hidden;
 }
 
+/*
+ * The header is separated by a change of tone rather than by a rule.
+ * A line across every panel was most of what made the page look like a
+ * set of boxes; a header that is a shade cooler than its body says the
+ * same thing without drawing anything.
+ */
 .panel > header {
-  padding: var(--s3) var(--s4);
-  border-bottom: 1px solid var(--line);
+  padding: var(--s3) var(--s5);
+  background: linear-gradient(180deg, var(--surface-sunk), rgba(248, 250, 252, 0));
   display: flex;
   align-items: center;
   gap: var(--s3);
@@ -475,18 +604,23 @@ html[data-player="1"] .cta-guest { display: none; }
 .panel > header h2,
 .panel > header h3 {
   font-size: 14px;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 .panel > header .grow { margin-left: auto; }
 
-.panel-body { padding: var(--s4); }
+/* Slightly shy at the top, because the header above it already carries
+   its own bottom padding — and a little more at the sides than the old
+   uniform 16px, which is most of what makes a rounded panel look
+   deliberate rather than stretched. */
+.panel-body { padding: var(--s4) var(--s5) var(--s5); }
 .panel-body.flush { padding: 0; }
 
 .label {
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -501,29 +635,40 @@ table {
   font-size: 14px;
 }
 
+/*
+ * No fill behind the column names and no rule under them — the tracking
+ * and the size already say "heading", and one more horizontal line was
+ * one more edge of one more box. The row separators are lighter than the
+ * page's hairline for the same reason: at fourteen rows they add up.
+ */
 th {
   text-align: left;
-  padding: 9px var(--s4);
+  padding: 11px var(--s5) 9px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-sunk);
+  background: transparent;
   font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.07em;
+  font-weight: 700;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
   white-space: nowrap;
 }
 
 td {
-  padding: var(--s3) var(--s4);
+  padding: var(--s3) var(--s5);
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
 
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover td { background: var(--surface-sunk); }
+
+/* Your own row, marked by a wash rather than by a border. The inset
+   shadow on the first cell is the only edge, and it reads as a marker in
+   the margin instead of a box around the row. */
 tr.is-me td { background: var(--accent-soft); }
 tr.is-me:hover td { background: var(--accent-soft); }
+tr.is-me td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 th.right, td.right { text-align: right; }
 th.center, td.center { text-align: center; }
@@ -716,9 +861,9 @@ html[data-player="1"] .search { display: inline-flex; }
   right: calc(var(--search-trigger) + var(--s2));
   top: 50%;
   translate: 0 -50%;
-  padding: 6px 10px;
+  padding: 7px 14px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-pill);
   background: var(--surface-sunk);
   font-family: inherit;
   font-size: 14px;
@@ -761,11 +906,11 @@ html[data-player="1"] .search { display: inline-flex; }
   max-height: 60vh;
   overflow-y: auto;
   background: var(--surface);
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+  box-shadow: var(--shadow-float);
   padding: var(--s2);
-  animation: drop-in 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: drop-in 0.2s var(--ease) both;
 }
 
 .search-drop ul {
@@ -785,7 +930,7 @@ html[data-player="1"] .search { display: inline-flex; }
   align-items: center;
   gap: var(--s3);
   width: 100%;
-  padding: 7px 9px;
+  padding: 8px 10px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -798,6 +943,18 @@ html[data-player="1"] .search { display: inline-flex; }
 /* Keyboard and mouse share one highlight, so there is never a second
    "selected" row following the pointer around. */
 .search-result.is-active { background: var(--surface-hover); }
+
+/* Buttons that are really rows or column headings do not take the lift
+   the standalone controls get — a list that shuffles under the pointer
+   is unreadable, and a table heading that rises detaches from its
+   column. */
+.search-result:hover,
+.sort-button:hover:not(:disabled),
+.chat-delete:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  border-color: transparent;
+}
 
 .search-result-glyph {
   width: 28px;
@@ -887,8 +1044,8 @@ html[data-player="1"] .search { display: inline-flex; }
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   background: var(--surface-sunk);
   font-family: var(--font-mono);
@@ -902,19 +1059,19 @@ html[data-player="1"] .search { display: inline-flex; }
 /* ── Pills ─────────────────────────────────────────────────────────── */
 
 /*
- * Square, like everything else, and set as a small tracked label rather
- * than a rounded badge — the pill shape was the one thing left that
- * still read as a product interface.
+ * Round again, and named honestly. They were squared off when the rest
+ * of the page was, and a square status marker beside a round button now
+ * looks like it belongs to a different interface.
  */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 9px;
-  border-radius: var(--radius-sm);
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
   color: var(--ink-2);
@@ -931,44 +1088,59 @@ html[data-player="1"] .search { display: inline-flex; }
 
 /* ── Buttons and forms ─────────────────────────────────────────────── */
 
+/*
+ * Fully round. Of everything on the page the buttons were the shapes
+ * that most insisted it was a form, and they are also the elements the
+ * eye lands on first — rounding them does more for the register of the
+ * whole page than rounding the panels did.
+ */
 button,
 .button {
   font-family: var(--font-body);
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: -0.008em;
   line-height: 1;
-  padding: 10px var(--s4);
-  border-radius: var(--radius-sm);
+  padding: 11px var(--s5);
+  border-radius: var(--radius-pill);
   border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--ink);
   cursor: pointer;
   transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease,
-    transform 0.08s ease;
+    background var(--quick) ease,
+    border-color var(--quick) ease,
+    color var(--quick) ease,
+    box-shadow var(--quick) ease,
+    transform var(--quick) var(--ease);
 }
 
 button:hover:not(:disabled),
 .button:hover {
   background: var(--surface-hover);
-  border-color: var(--ink-3);
+  border-color: var(--line-strong);
   text-decoration: none;
+  /* A hair off the page, not a jump. Paired with the 1px press below it
+     gives a control a top and a bottom to travel between. */
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button:disabled:hover { transform: none; box-shadow: none; }
 
 button.primary,
 .button.primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #ffffff;
+  box-shadow: 0 1px 2px rgba(27, 58, 107, 0.16), 0 10px 22px -14px rgba(27, 58, 107, 0.7);
 }
 button.primary:hover:not(:disabled),
 .button.primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
+  box-shadow: 0 2px 4px rgba(27, 58, 107, 0.18), 0 16px 30px -14px rgba(27, 58, 107, 0.8);
 }
 
 button.quiet {
@@ -981,11 +1153,13 @@ button.quiet:hover:not(:disabled) {
   background: var(--surface-hover);
   border-color: transparent;
   color: var(--ink);
+  box-shadow: none;
+  transform: none;
 }
 
-button.small, .button.small { padding: 7px 12px; font-size: 13px; }
+button.small, .button.small { padding: 8px 14px; font-size: 13px; }
 button.danger { color: var(--down); }
-button.danger:hover:not(:disabled) { border-color: var(--down); background: #fdf3f2; }
+button.danger:hover:not(:disabled) { border-color: #e3b7b2; background: #fdf3f2; }
 
 /* Sign out is the one control that throws away what you are looking at,
    so it does not get to look like a navigation link. */
@@ -1005,13 +1179,25 @@ input,
 select,
 textarea {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 14.5px;
   width: 100%;
-  padding: 9px 11px;
+  padding: 11px 14px;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  background: var(--surface);
+  background: var(--surface-sunk);
   color: var(--ink);
+  transition: background var(--quick) ease, border-color var(--quick) ease, box-shadow var(--quick) ease;
+}
+
+/* A field that is being typed into comes up to white and picks up a soft
+   ring, so the focused one is obvious without the outline having to
+   shout. */
+input:focus,
+select:focus,
+textarea:focus {
+  background: var(--surface);
+  border-color: var(--line-strong);
+  box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
 input:disabled,
@@ -1038,11 +1224,11 @@ fieldset { border: 0; margin: 0; padding: 0; }
 /* ── Notices ───────────────────────────────────────────────────────── */
 
 .notice {
-  padding: var(--s3) var(--s4);
+  padding: var(--s3) var(--s5);
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--surface-sunk);
-  font-size: 14px;
+  font-size: 14.5px;
 }
 .notice.good { border-color: #bfe0cb; background: #f2f9f5; color: var(--up); }
 .notice.bad { border-color: #f0c8c4; background: #fdf3f2; color: var(--down); }
@@ -1086,10 +1272,11 @@ fieldset { border: 0; margin: 0; padding: 0; }
 }
 
 .guide-hero { max-width: 60ch; }
-.guide-hero h1 { font-size: 36px; letter-spacing: -0.03em; }
+.guide-hero h1 { font-size: clamp(34px, 5vw, 46px); letter-spacing: -0.038em; }
 .guide-hero p {
-  margin-top: var(--s3);
-  font-size: 17px;
+  margin-top: var(--s4);
+  font-size: 18px;
+  line-height: 1.6;
   color: var(--ink-2);
 }
 
@@ -1103,12 +1290,17 @@ fieldset { border: 0; margin: 0; padding: 0; }
   display: inline-flex;
   align-items: baseline;
   gap: 6px;
-  padding: 5px 11px;
-  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunk);
   border: 1px solid var(--line);
   font-size: 13px;
   color: var(--ink-2);
+  transition: border-color var(--quick) ease, transform var(--quick) var(--ease);
+}
+.guide-chip:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
 }
 .guide-chip strong {
   font-family: var(--font-mono);
@@ -1155,18 +1347,23 @@ fieldset { border: 0; margin: 0; padding: 0; }
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
 }
 .guide-card {
-  padding: var(--s4);
+  padding: var(--s5);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
-  transition: border-color 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: var(--shadow-sm);
+  transition:
+    border-color var(--quick) ease,
+    box-shadow var(--quick) ease,
+    transform var(--quick) var(--ease);
 }
 .guide-card:hover {
   border-color: var(--line-strong);
-  transform: translateY(-2px);
+  box-shadow: var(--shadow-lift);
+  transform: translateY(-3px);
 }
-.guide-card h3 { margin-bottom: 6px; }
-.guide-card p { color: var(--ink-2); font-size: 14px; }
+.guide-card h3 { margin-bottom: 8px; }
+.guide-card p { color: var(--ink-2); font-size: 14.5px; }
 
 /* The checkpoints, as a line you can follow. This is the part that
    changed most recently and the easiest thing to misread from a
@@ -1209,9 +1406,13 @@ fieldset { border: 0; margin: 0; padding: 0; }
   .guide-split { grid-template-columns: minmax(0, 260px) minmax(0, 1fr); }
 }
 
+/* `separate` rather than `collapse` so the corners actually round:
+   a collapsed table paints its cell borders over the container's radius
+   and the overflow clip has nothing to clip. */
 .guide-points {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
@@ -1268,7 +1469,7 @@ th.sortable { padding: 0; }
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 9px var(--s4);
+  padding: 11px var(--s5) 9px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1309,8 +1510,8 @@ th.sortable.is-sorted .sort-button { color: var(--accent); }
 .chat-composer {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
-  padding: var(--s4);
+  gap: var(--s3);
+  padding: var(--s5);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--surface);
@@ -1396,8 +1597,10 @@ th.sortable.is-sorted .sort-button { color: var(--accent); }
    back up the page. */
 .reveal {
   opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.45s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateY(16px);
+  transition:
+    opacity var(--settle) ease,
+    transform 0.62s var(--ease);
   will-change: opacity, transform;
 }
 .reveal.is-visible {
@@ -1425,12 +1628,293 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 
 .notice { animation: rise 0.28s ease both; }
 
+/* ── The landing page ──────────────────────────────────────────────────
+ *
+ * The one screen in the app that is not a table, and the only one that
+ * gets to look like it. Everything here is scoped under .home or
+ * .home-sky, so nothing in this section can reach a page of numbers.
+ *
+ * The sky is an absolute child of <body> — see components/Backdrop.tsx
+ * for why it cannot live in the page — and it scrolls away with the hero
+ * rather than sitting fixed behind the whole document.
+ */
+
+.home-sky {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 900px;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+
+  /*
+   * Navy overhead, steel blue through the middle, white by the bottom —
+   * the logo's own gradient, turned to run down a page instead of across
+   * a square.
+   *
+   * It stays dark through the first 45% on purpose. That is the band the
+   * headline and the paragraph sit in, and a gradient that lightens
+   * evenly from the top leaves the last line of body copy at about 3:1
+   * against its background. The lightening is pushed below the text and
+   * then happens quickly.
+   */
+  background:
+    radial-gradient(1100px 560px at 84% -14%, rgba(167, 196, 223, 0.5), rgba(167, 196, 223, 0) 68%),
+    radial-gradient(760px 460px at 0% -8%, rgba(5, 18, 38, 0.72), rgba(5, 18, 38, 0) 64%),
+    linear-gradient(
+      172deg,
+      #10294a 0%,
+      #17355a 20%,
+      #24496f 40%,
+      #3d6690 55%,
+      #7d9dbe 68%,
+      #c2d2e2 80%,
+      #eef3f8 90%,
+      #ffffff 100%
+    );
+}
+
+/* A slow wash of light across the navy, so the top of the page is not a
+   flat fill. Transform only, on one composited layer — it costs nothing
+   per frame and it is the difference between a gradient and a sky. */
+.home-sky::before {
+  content: "";
+  position: absolute;
+  inset: -18% -12% auto;
+  height: 82%;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(146, 186, 226, 0.36),
+    rgba(146, 186, 226, 0) 70%
+  );
+  animation: sky-drift 28s ease-in-out infinite alternate;
+}
+
+@keyframes sky-drift {
+  from { transform: translate3d(-9%, -2%, 0) scale(1); }
+  to { transform: translate3d(11%, 7%, 0) scale(1.18); }
+}
+
+/* The hero is above the fold on every window, so it cannot wait for an
+   IntersectionObserver the way <Reveal> blocks do — the first thing a
+   visitor sees would be nothing at all until React had hydrated. It is a
+   plain CSS animation with a stagger set per element in the page.
+
+   `backwards` rather than `both`: the finished state is simply the
+   element's own, so the animation should let go of it once it is done
+   and leave hover transforms alone. */
+.home-hero > *,
+.home-figure {
+  animation: hero-in 0.75s var(--ease) backwards;
+}
+
+@keyframes hero-in {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The shell's own arrival animation would run underneath all of that and
+   muddy it. One entrance per page. */
+.shell:has(.home) { animation: none; }
+
+.home-hero {
+  padding-top: clamp(56px, 11vh, 108px);
+  max-width: 760px;
+}
+
+.home-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 15px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.home-eyebrow::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
+}
+
+.home-hero h1 {
+  margin-top: var(--s5);
+  font-size: clamp(40px, 7.2vw, 64px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -0.042em;
+  color: #ffffff;
+}
+
+/* The last line, in a tint of the sky it is printed on. The colour is
+   set first and then overpainted by the clipped gradient, so a browser
+   that does not do background-clip still gets a legible line rather than
+   a transparent one. */
+.home-hero h1 em {
+  font-style: normal;
+  color: #b9d2ea;
+  background: linear-gradient(100deg, #d6e6f6, #8fb6dd);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.home-hero p {
+  margin-top: var(--s5);
+  max-width: 54ch;
+  font-size: clamp(16px, 1.6vw, 18.5px);
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.home-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-top: var(--s6);
+}
+
+.home-actions .button {
+  padding: 13px var(--s6);
+  font-size: 15px;
+}
+
+/* On navy, the strongest button is a white one — the page's usual navy
+   fill would disappear into the background. */
+.home-actions .button.primary {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: var(--accent);
+  box-shadow: 0 12px 34px -14px rgba(2, 12, 28, 0.85);
+}
+.home-actions .button.primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 40px -14px rgba(2, 12, 28, 0.9);
+}
+
+.button.ghost {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+.button.ghost:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+}
+
+/* ── The three figures ─────────────────────────────────────────────────
+   These sit across the join, where the sky has gone pale but has not
+   finished. A translucent white tile with a blur behind it keeps them on
+   one surface all the way across that change, which a solid fill in any
+   single colour would not. */
+
+.home-figures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s3);
+  margin-top: clamp(var(--s7), 9vh, var(--s8));
+}
+
+.home-figure {
+  display: grid;
+  gap: 3px;
+  padding: var(--s5);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 24px 56px -34px rgba(9, 25, 48, 0.6);
+  transition: transform var(--quick) var(--ease), box-shadow var(--quick) ease;
+}
+.home-figure:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 30px 64px -32px rgba(9, 25, 48, 0.7);
+}
+
+.home-figure strong {
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--accent);
+}
+
+.home-figure-unit {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+}
+
+.home-figure-caption {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+/* ── The four rules ────────────────────────────────────────────────────
+   Plain text on white, separated by space rather than by cards. The one
+   line across the top fades out at both ends: a rule that stops short of
+   the edges divides without drawing another box. */
+
+.home-points {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--s6) var(--s7);
+  margin-top: clamp(var(--s7), 10vh, 88px);
+  padding-top: var(--s7);
+}
+
+.home-points::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-strong) 22%, var(--line-strong) 78%, transparent);
+}
+
+.home-point {
+  display: grid;
+  gap: 9px;
+}
+.home-point p {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+
+@media (max-width: 720px) {
+  .home-sky { height: 1040px; }
+  .home-figures { grid-template-columns: 1fr; }
+  .home-figure { padding: var(--s4) var(--s5); }
+}
+
 /* ── Site footer ───────────────────────────────────────────────────── */
 
 .site-footer {
   flex: 0 0 auto;
   border-top: 1px solid var(--line);
   background: var(--surface-sunk);
+  /* Above the landing page's sky, like .shell — the sky is tall enough
+     to reach the footer on a short window. */
+  position: relative;
+  z-index: 1;
 }
 
 .site-footer-inner {
@@ -1460,7 +1944,18 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 .byline { font-weight: 500; }
 
 @media (prefers-reduced-motion: reduce) {
-  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  /* Pseudo-elements too: the landing page's drifting light is one, and a
+     duration cap that does not reach it would leave the only moving
+     thing on the page still moving. The delay has to go as well, or the
+     staggered hero arrives instantly but a third of a second late. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 
   /* Everything above is decoration. Anyone who has asked for less motion
      gets the finished state immediately, never a fade they have to wait
