@@ -36,7 +36,7 @@ export function UniverseAdmin({
   const counts = useMemo(() => {
     const map = new Map<string, number>();
     for (const i of instruments) {
-      if (!i.eligible || i.isBenchmark) continue;
+      if (!i.eligible) continue;
       map.set(i.marketCode, (map.get(i.marketCode) ?? 0) + 1);
     }
     return map;
@@ -62,7 +62,7 @@ export function UniverseAdmin({
 
       // Eligibility is what the security rules actually check, so closing a
       // market has to reach its instruments too, not just the filter list.
-      const affected = instruments.filter((i) => i.marketCode === market.code && !i.isBenchmark);
+      const affected = instruments.filter((i) => i.marketCode === market.code);
       for (let start = 0; start < affected.length; start += 400) {
         const batch = writeBatch(firestore());
         for (const instrument of affected.slice(start, start + 400)) {
@@ -103,7 +103,6 @@ export function UniverseAdmin({
         marketCode: newMarket,
         currency: market?.currency ?? "SEK",
         eligible: true,
-        isBenchmark: false,
         marketCapMusd: null,
         tags: [],
       });
@@ -123,7 +122,7 @@ export function UniverseAdmin({
         <h2>Pickable universe</h2>
         <span className="grow" />
         <span className="hint">
-          {instruments.filter((i) => i.eligible && !i.isBenchmark).length} eligible
+          {instruments.filter((i) => i.eligible).length} eligible
         </span>
       </header>
 
@@ -244,12 +243,10 @@ export function UniverseAdmin({
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {instrument.name}
                   </span>
-                  {instrument.isBenchmark ? <span className="pill">benchmark</span> : null}
                 </span>
                 <button
                   type="button"
                   className="small quiet"
-                  disabled={instrument.isBenchmark}
                   onClick={() => void toggleEligible(instrument)}
                   style={{ color: instrument.eligible ? "var(--up)" : "var(--ink-3)" }}
                 >

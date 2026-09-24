@@ -63,46 +63,6 @@ export function useCollection<T>(path: string, enabled: boolean): Loadable<(T & 
  * once in the root layout — see the note there for why.
  */
 
-/**
- * The benchmark instruments, and nothing else from the universe.
- *
- * The history page wants a couple of index lines beside each settled
- * month and needs no other instrument at all: the picks documents carry
- * their own symbol and name, so the tables never consult the universe.
- * It was calling useUniverse() anyway, which bought all 450 instruments
- * to render two pills — the single largest read on the page, and the
- * largest avoidable one in the app.
- *
- * A `where` on a single field needs no composite index, so this costs
- * the two documents it actually returns.
- */
-export function useBenchmarks(enabled: boolean) {
-  const [benchmarks, setBenchmarks] = useState<Instrument[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!enabled) {
-      setBenchmarks([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    const unsubscribe = onSnapshot(
-      query(collection(firestore(), "instruments"), where("isBenchmark", "==", true)),
-      (snap) => {
-        setBenchmarks(snap.docs.map((d) => ({ ...(d.data() as Instrument), id: d.id })));
-        setLoading(false);
-      },
-      // A benchmark line missing is a cosmetic loss; the month's table
-      // beside it is the part that matters and does not depend on this.
-      () => setLoading(false),
-    );
-    return unsubscribe;
-  }, [enabled]);
-
-  return { benchmarks, loading };
-}
-
 /** Live prices for one round. */
 export function useRoundPrices(roundId: string | null) {
   const path = roundId ? `rounds/${roundId}/prices` : "";

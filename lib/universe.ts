@@ -39,7 +39,6 @@ export type InstrumentSeed = {
   name: string;
   marketCode: string;
   currency: string;
-  isBenchmark?: boolean;
 };
 
 export const MARKETS: MarketSeed[] = [
@@ -287,8 +286,6 @@ export const INSTRUMENTS: InstrumentSeed[] = [
   ]),
 
   // Priced alongside the picks for comparison, never pickable.
-  { symbol: "OMXS30", name: "OMX Stockholm 30", marketCode: "SE_LARGE", currency: "SEK", isBenchmark: true },
-  { symbol: "SPX", name: "S&P 500", marketCode: "US_NYSE", currency: "USD", isBenchmark: true },
 ];
 
 /** Stable Firestore document id for an instrument. */

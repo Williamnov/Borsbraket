@@ -9,15 +9,44 @@ import {
   type SeasonRow,
 } from "./types";
 
-/** Points for finishing 1st, 2nd, 3rd … Everyone further down gets 1. */
-export const POINTS = [10, 7, 5, 4, 3, 2] as const;
-export const TAIL_POINTS = 1;
+/**
+ * What a month pays, and for what.
+ *
+ * Three awards rather than a finishing table. A podium paid six places
+ * for turning up in a league of a handful of players, which meant the
+ * difference between second and fifth was worth more than beating
+ * everybody, and the monthly total told you nothing about what anyone
+ * had actually done.
+ *
+ * Each award answers a different question, and one player can take all
+ * three in the same month:
+ *
+ *  - bestPortfolio — did you beat everyone? This pays on the best
+ *    return of the month whether or not that return is positive. In a
+ *    month where everyone is down, -1% against -2% is still the best
+ *    portfolio in the league and is still worth winning.
+ *
+ *  - bestStock — did you hold the single best pick anyone made? This is
+ *    the one award with a floor: a stock that is down cannot be the
+ *    month's best call, however much less it fell than everything else.
+ *
+ *  - positive — did you make money at all? The consolation, and the
+ *    reason a good month in a strong field is still worth something.
+ *
+ * A losing portfolio that wins nothing scores nothing. These three
+ * numbers are the whole tuning surface of the league; change them here.
+ */
+export const POINTS = {
+  bestPortfolio: 10,
+  bestStock: 5,
+  positive: 2,
+} as const;
+
 export const WEEKS_PER_ROUND = 4;
 export const MAX_PICKS = 5;
 
-export function pointsForRank(rank: number): number {
-  return POINTS[rank - 1] ?? TAIL_POINTS;
-}
+/** The most one player can take from one month. */
+export const MAX_MONTHLY_POINTS = POINTS.bestPortfolio + POINTS.bestStock + POINTS.positive;
 
 /** Where a round is right now, read from the clock rather than a stale field. */
 export function roundPhase(round: Round, now = new Date()): "open" | "live" | "settled" {
@@ -97,6 +126,8 @@ export function scoreRound(
       total: scored.length,
       rank: null,
       points: null,
+      awards: { bestPortfolio: false, bestStock: false, positive: false },
+      bestStockSymbol: null,
     };
   });
 
@@ -107,10 +138,59 @@ export function scoreRound(
     return b.ret - a.ret;
   });
 
+  /*
+   * How far from zero a return has to be before it counts as a gain.
+   *
+   * A portfolio holding +10% and −10% averages to 5.6e-17, not 0, in
+   * binary floating point — enough to collect the award for finishing
+   * the month up on a portfolio that did nothing of the kind. Nothing
+   * this league measures means anything below a millionth of a percent.
+   */
+  const FLAT = 1e-9;
+
+  // The best portfolio in the field. Not "the best positive portfolio":
+  // in a month where everyone is down, somebody still lost least, and
+  // that is the month's win.
+  const returns = entries.map((e) => e.ret).filter((r): r is number => r !== null);
+  const bestReturn = returns.length ? Math.max(...returns) : null;
+
+  // The best single pick anyone made. Unlike the portfolio award this
+  // one has a floor: the least bad stock in a bad month is not a good
+  // call, so a negative best pays nobody.
+  let bestPick: number | null = null;
+  for (const entry of entries) {
+    for (const pick of entry.picks) {
+      if (pick.ret !== null && (bestPick === null || pick.ret > bestPick)) bestPick = pick.ret;
+    }
+  }
+  const stockAwardStands = bestPick !== null && bestPick > 0;
+
   const settled = round.status === "settled";
   entries.forEach((entry, i) => {
     entry.rank = entry.ret === null ? null : i + 1;
-    entry.points = settled && entry.rank !== null ? pointsForRank(entry.rank) : null;
+
+    // Ties share rather than split. Two players on the same return have
+    // both beaten the field, and there is no sensible tiebreak between
+    // two portfolios that performed identically.
+    const bestPortfolio = entry.ret !== null && entry.ret === bestReturn;
+    const winner = stockAwardStands
+      ? (entry.picks.find((p) => p.ret === bestPick) ?? null)
+      : null;
+    const positive = entry.ret !== null && entry.ret > FLAT;
+
+    entry.awards = { bestPortfolio, bestStock: winner !== null, positive };
+    entry.bestStockSymbol = winner?.symbol ?? null;
+
+    // Points are the settlement, not a running total: nothing is
+    // awarded until an admin closes the month. A portfolio with nothing
+    // priced has no result rather than a result of zero — it is waiting
+    // on the price job, not beaten.
+    entry.points =
+      settled && entry.ret !== null
+        ? (bestPortfolio ? POINTS.bestPortfolio : 0) +
+          (winner !== null ? POINTS.bestStock : 0) +
+          (positive ? POINTS.positive : 0)
+        : null;
   });
 
   return entries;
@@ -141,7 +221,9 @@ export function buildSeason(
       const row = rows.get(entry.uid);
       if (!row) continue;
       row.points += entry.points ?? 0;
-      if (entry.rank === 1) row.wins += 1;
+      // The award, not rank 1 — two players tied on the month's best
+      // return have both won it, and the sort gives one of them rank 2.
+      if (entry.awards.bestPortfolio) row.wins += 1;
       if (entry.ret !== null) {
         row.played += 1;
         row.monthly.push({ roundId: round.id, ret: entry.ret });
@@ -291,7 +373,50 @@ const DAY_MS = 86_400_000;
 export function checkpointDueDates(round: Round): Date[] | null {
   const lock = toDate(round.locksAt);
   if (!lock) return null;
-  return [0, 1, 2, 3, 4].map((k) => new Date(lock.getTime() + k * 7 * DAY_MS));
+
+  const weekly = [0, 1, 2, 3].map((k) => new Date(lock.getTime() + k * 7 * DAY_MS));
+
+  /*
+   * The last checkpoint is the round's end date, not the lock plus
+   * twenty-eight days.
+   *
+   * A round now finishes on the first day of the month's last week, and
+   * the gap from the lock to there is not a whole number of weeks —
+   * between 24 and 31 days depending on how the calendar falls. Pinning
+   * the final checkpoint to the end means the last price recorded is
+   * the one the month is actually judged on, rather than a price from
+   * two days after the next month's picks have already opened.
+   *
+   * The first four stay exactly a week apart, so all that moves is the
+   * length of the final leg.
+   */
+  const end = endInstant(round.endsOn, lock);
+  const fourWeeks = new Date(lock.getTime() + 4 * 7 * DAY_MS);
+
+  // An endsOn that is missing, malformed or earlier than the third
+  // checkpoint cannot be the last one — an admin is free to type
+  // anything into that field, and a non-monotonic run of due dates
+  // would have currentCheckpoint reporting nonsense.
+  return [...weekly, end && end > weekly[3] ? end : fourWeeks];
+}
+
+/**
+ * A YYYY-MM-DD round boundary as an instant, at the same time of day as
+ * the lock — so every checkpoint in a round falls at the same hour and
+ * the first cron run after each one records the same kind of price.
+ */
+function endInstant(endsOn: string | undefined, lock: Date): Date | null {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(endsOn ?? "");
+  if (!parts) return null;
+  const at = Date.UTC(
+    Number(parts[1]),
+    Number(parts[2]) - 1,
+    Number(parts[3]),
+    lock.getUTCHours(),
+    lock.getUTCMinutes(),
+    lock.getUTCSeconds(),
+  );
+  return Number.isNaN(at) ? null : new Date(at);
 }
 
 /**
@@ -326,14 +451,93 @@ export function isPricingOpen(round: Round, when: Date): boolean {
   );
 }
 
-/** Sensible defaults for a fresh month: opens on the 1st, locks on the 4th. */
+/* ── The shape of a month ──────────────────────────────────────────────
+ *
+ * Picking happens in the last week of the month *before* the one being
+ * played. A round for October opens on the last Monday of September,
+ * seals on the last weekday of September, and runs through October to
+ * the last Monday of October — at which point the next round's picking
+ * week begins, and the two meet end to end with no gap and no overlap.
+ *
+ * This replaced picking in the first few days of the month itself.
+ * Under that shape a month's scoring did not start until the 4th, so
+ * the first three trading days of every month went unmeasured, and the
+ * round ran two days into the next one.
+ */
+
+/** Midnight UTC on the last day of a month. `month` is 1-based. */
+function lastDayOfMonth(year: number, month: number): Date {
+  return new Date(Date.UTC(year, month, 0));
+}
+
+/**
+ * The first day of a month's last week: its last Monday.
+ *
+ * Weeks start on Monday here, as they do everywhere this league is
+ * played. This is always the Monday of the week containing the month's
+ * final day — the next Monday would already be in the month after.
+ */
+export function lastMondayOfMonth(year: number, month: number): Date {
+  const day = lastDayOfMonth(year, month);
+  // getUTCDay is 0 for Sunday, so this is "days back to Monday".
+  const back = (day.getUTCDay() + 6) % 7;
+  return new Date(day.getTime() - back * DAY_MS);
+}
+
+/**
+ * The last Monday-to-Friday of a month — its final trading day, holidays
+ * aside. Picks close here, which is also where the baseline is taken.
+ */
+export function lastWeekdayOfMonth(year: number, month: number): Date {
+  const day = lastDayOfMonth(year, month);
+  const weekday = day.getUTCDay();
+  if (weekday === 0) return new Date(day.getTime() - 2 * DAY_MS); // Sunday
+  if (weekday === 6) return new Date(day.getTime() - 1 * DAY_MS); // Saturday
+  return day;
+}
+
+/** Picking opens at the start of the last Monday, in UTC. */
+const OPEN_HOUR_UTC = 6;
+
+/**
+ * And closes late on the last weekday — after the US close, which is
+ * 20:00 UTC in summer and 21:00 in winter.
+ *
+ * That hour is doing two jobs. It leaves a usable picking window even in
+ * the months where the last Monday *is* the last weekday, which happens
+ * whenever a month ends on a Monday or on the weekend after one. And it
+ * puts every checkpoint after the last market of the day has shut, so
+ * the next morning's cron run reads a settled closing price rather than
+ * whatever a half-open market happened to be quoting.
+ */
+const LOCK_HOUR_UTC = 22;
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function at(date: Date, hourUtc: number): Date {
+  return new Date(date.getTime() + hourUtc * 60 * 60 * 1000);
+}
+
+/**
+ * The standard schedule for a month: picking in the last week of the
+ * month before, scoring through the month itself.
+ */
 export function defaultRoundShape(year: number, month: number) {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const beforeYear = month === 1 ? year - 1 : year;
+  const beforeMonth = month === 1 ? 12 : month - 1;
+
+  const opens = at(lastMondayOfMonth(beforeYear, beforeMonth), OPEN_HOUR_UTC);
+  const locks = at(lastWeekdayOfMonth(beforeYear, beforeMonth), LOCK_HOUR_UTC);
+  const ends = lastMondayOfMonth(year, month);
+
   return {
-    opensAt: new Date(Date.UTC(year, month - 1, 1, 6, 0, 0)),
-    locksAt: new Date(Date.UTC(year, month - 1, 4, 7, 0, 0)),
-    startsOn: `${year}-${pad(month)}-01`,
-    endsOn: `${year}-${pad(month)}-${pad(lastDay)}`,
+    opensAt: opens,
+    locksAt: locks,
+    // The lock is the baseline, so it is also where the scoring window
+    // starts. The old shape said the 1st and measured from the 4th.
+    startsOn: isoDate(locks),
+    endsOn: isoDate(ends),
   };
 }

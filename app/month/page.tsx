@@ -18,7 +18,6 @@ import {
   useColumnSort,
 } from "@/components/ui";
 import {
-  useBenchmarks,
   useInstrumentSearch,
   useMarketInstruments,
   useMyPicks,
@@ -29,10 +28,32 @@ import {
 import { useLeagueBase } from "@/components/LeagueProvider";
 import { instrumentReturn, roundPhase, scoreRound, sortEntries, weeklyPath, type EntrySort } from "@/lib/scoring";
 import { displayName, formatDate, formatPercent, monthLabel } from "@/lib/format";
-import { toDate } from "@/lib/types";
+import { toDate, type ScoredEntry } from "@/lib/types";
 
 /** Columns whose first click should read small-to-large. */
 const ASC_FIRST: readonly EntrySort[] = ["rank", "player"];
+
+/**
+ * What a player won this month, under their name.
+ *
+ * Three awards can stack, so the points column alone does not say what
+ * happened — 17 and 12 and 5 are all different stories. Nothing is
+ * drawn for a month that has not been settled, because nothing has been
+ * awarded yet; the flags are still computed so the running table can
+ * show who is on course, which is what the "leading" tone is for.
+ */
+function AwardChips({ entry }: { entry: ScoredEntry }) {
+  const { bestPortfolio, bestStock, positive } = entry.awards;
+  if (!bestPortfolio && !bestStock && !positive) return null;
+
+  return (
+    <span className="awards">
+      {bestPortfolio ? <span className="award best">Best portfolio</span> : null}
+      {bestStock ? <span className="award stock">Best stock · {entry.bestStockSymbol}</span> : null}
+      {positive ? <span className="award up">Up</span> : null}
+    </span>
+  );
+}
 
 export default function MonthPage() {
   return (
@@ -47,9 +68,8 @@ function MonthView() {
   // Markets come with the shared base now: a few dozen documents, and
   // the page needs them to offer a choice before it knows which
   // instruments to load. The instruments themselves arrive one market at
-  // a time — see useMarketInstruments — and the benchmarks are two.
+  // a time — see useMarketInstruments.
   const { profiles, profileMap, rounds, settings, markets, loading } = useLeagueBase();
-  const { benchmarks: benchmarkInstruments } = useBenchmarks(true);
 
   const enabledMarkets = useMemo(() => markets.filter((m) => m.isEnabled), [markets]);
 
@@ -103,13 +123,6 @@ function MonthView() {
     [round, locked, pickDocs, prices],
   );
 
-  const benchmarks = useMemo(
-    () =>
-      benchmarkInstruments
-        .map((i) => ({ instrument: i, ...instrumentReturn(prices.get(i.id)) }))
-        .filter((b) => b.ret !== null),
-    [benchmarkInstruments, prices],
-  );
 
   const { sortBy, direction, onSort } = useColumnSort<EntrySort>("rank", ASC_FIRST);
 
@@ -244,15 +257,6 @@ function MonthView() {
       <section className="panel" style={{ marginTop: 20 }}>
         <header>
           <h2>This month&rsquo;s table</h2>
-          <span className="grow" />
-          {/* The index lines, labelled — an unexplained "OMXS30 +2.1%"
-              beside a table of players reads as another competitor. */}
-          {benchmarks.length ? <span className="label">Index</span> : null}
-          {benchmarks.map((b) => (
-            <span key={b.instrument.id} className="pill">
-              {b.instrument.symbol} {formatPercent(b.ret)}
-            </span>
-          ))}
         </header>
         <div className="panel-body flush table-scroll">
           {phase === "open" ? (
@@ -317,6 +321,10 @@ function MonthView() {
                           profile={profileMap.get(entry.uid)}
                           you={entry.uid === profile?.uid}
                         />
+                        {/* What the points in the last column are for.
+                            A bare "17" is a number you have to go and
+                            work out from the rules page. */}
+                        <AwardChips entry={entry} />
                       </td>
                       <td>
                         <WeekBars path={path} />

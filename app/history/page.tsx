@@ -12,7 +12,7 @@ import {
   Value,
   useColumnSort,
 } from "@/components/ui";
-import { useBenchmarks, useRoundBundles } from "@/lib/hooks";
+import { useRoundBundles } from "@/lib/hooks";
 import { useLeagueBase } from "@/components/LeagueProvider";
 import { instrumentReturn, scoreRound, sortEntries, type EntrySort } from "@/lib/scoring";
 import { displayName, formatPercent, monthLabel } from "@/lib/format";
@@ -32,9 +32,6 @@ export default function HistoryPage() {
 function History() {
   const { profile } = useAuth();
   const { profileMap, rounds, loading } = useLeagueBase();
-  // Benchmarks only. Nothing on this page reads the rest of the universe
-  // — the picks carry their own symbols and names.
-  const { benchmarks, loading: benchmarksLoading } = useBenchmarks(true);
 
   const settled = useMemo(
     () => rounds.filter((r) => r.status === "settled").sort((a, b) => b.id.localeCompare(a.id)),
@@ -74,7 +71,7 @@ function History() {
     return { best, worst, bestMonth };
   }, [scoredByRound]);
 
-  if (loading || benchmarksLoading || bundlesLoading) return <Empty>Loading history…</Empty>;
+  if (loading || bundlesLoading) return <Empty>Loading history…</Empty>;
 
   if (settled.length === 0) {
     return (
@@ -140,9 +137,6 @@ function History() {
           const entries = scoredByRound.get(round.id) ?? [];
           const winner = entries[0];
           const bundle = bundles.get(round.id);
-          const benchmark = benchmarks
-            .map((i) => ({ symbol: i.symbol, ...instrumentReturn(bundle?.prices.get(i.id)) }))
-            .filter((b) => b.ret !== null);
 
           return (
             <Reveal key={round.id} delay={Math.min(index, 5) * 50}>
@@ -169,11 +163,6 @@ function History() {
                 ) : (
                   <span className="hint">No entries</span>
                 )}
-                {benchmark.map((b) => (
-                  <span key={b.symbol} className="pill">
-                    {b.symbol} {formatPercent(b.ret)}
-                  </span>
-                ))}
               </summary>
 
               <MonthTable entries={entries} profileMap={profileMap} meUid={profile?.uid} />

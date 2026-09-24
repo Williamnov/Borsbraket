@@ -73,7 +73,7 @@ function LeagueTable() {
       <PageHead title="Season table">
         {settledCount === 0
           ? "No month has been settled yet. The table fills in once the first one closes."
-          : `${settledCount} ${settledCount === 1 ? "month" : "months"} settled. Points are 10/7/5/4/3/2, then 1 for everyone else who submitted. Click a column to sort by it.`}
+          : `${settledCount} ${settledCount === 1 ? "month" : "months"} settled. Each month pays the best portfolio, whoever held its best single stock, and anyone who finished up. Click a column to sort by it.`}
       </PageHead>
 
       <Reveal>

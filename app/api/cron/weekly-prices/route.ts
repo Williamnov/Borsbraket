@@ -80,7 +80,6 @@ type InstrumentFields = {
   symbol?: string;
   marketCode?: string;
   currency?: string;
-  isBenchmark?: boolean;
 };
 
 /** getAll takes them all in one call; this is a guard, not a tuned batch. */
@@ -88,7 +87,7 @@ const GETALL_CHUNK = 300;
 
 /**
  * The instruments a set of rounds actually needs: everything held this
- * month, plus the benchmarks.
+ * month.
  *
  * This used to be `db.collection("instruments").get()` — the whole
  * universe, to look up the sixty-odd documents a month's picks refer to.
@@ -99,10 +98,8 @@ const GETALL_CHUNK = 300;
  * daily reads to discover, most days, that nothing needed writing.
  *
  * Fetching the picks first and then asking for those ids by name costs
- * one read per document returned, and the benchmarks come from a
- * single-field `where` that bills for the two it finds. Same data, and
- * the bill now scales with how many stocks are held rather than with
- * how many exist.
+ * one read per document returned. Same data, and the bill now scales
+ * with how many stocks are held rather than with how many exist.
  */
 async function loadInstruments(
   db: Db,
@@ -110,16 +107,10 @@ async function loadInstruments(
 ): Promise<Map<string, InstrumentFields>> {
   const collection = db.collection("instruments");
   const instruments = new Map<string, InstrumentFields>();
+  const wanted = [...ids];
 
-  const benchmarksSnap = await collection.where("isBenchmark", "==", true).get();
-  for (const d of benchmarksSnap.docs) instruments.set(d.id, d.data() as InstrumentFields);
-
-  // The benchmarks are already in hand, so asking for them again would
-  // be paying for them twice.
-  const missing = [...ids].filter((id) => !instruments.has(id));
-
-  for (let i = 0; i < missing.length; i += GETALL_CHUNK) {
-    const refs = missing.slice(i, i + GETALL_CHUNK).map((id) => collection.doc(id));
+  for (let i = 0; i < wanted.length; i += GETALL_CHUNK) {
+    const refs = wanted.slice(i, i + GETALL_CHUNK).map((id) => collection.doc(id));
     // A pick can name an instrument that has since been removed from the
     // universe; getAll returns a non-existent snapshot for it, which is
     // skipped here and reported as an unpriceable symbol downstream.
@@ -180,9 +171,6 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
   }
 
   const instruments = await loadInstruments(db, everyPick);
-  const benchmarkIds = [...instruments]
-    .filter(([, instrument]) => instrument.isBenchmark)
-    .map(([id]) => id);
 
   const plans: RoundPlan[] = [];
 
@@ -190,9 +178,7 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
     if (!entry) continue;
     const { round, checkpoint, existing } = entry;
 
-    // Everything held this month, plus the benchmarks.
-    const wanted = new Set(entry.picked);
-    for (const id of benchmarkIds) wanted.add(id);
+    const wanted = entry.picked;
 
     const field = WEEK_FIELDS[checkpoint];
     const requests: PriceRequest[] = [];
@@ -222,9 +208,6 @@ async function buildPlan(db: Db, rounds: Round[], now: Date): Promise<RoundPlan[
         // Checked against what the feed reports, so a symbol that
         // resolves on the wrong exchange is dropped rather than scored.
         currency: instrument.currency ?? "",
-        // An index is named differently from a share by every feed, and
-        // the fetcher cannot tell from the ticker alone.
-        isBenchmark: instrument.isBenchmark === true,
       });
     }
 

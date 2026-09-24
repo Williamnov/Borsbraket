@@ -208,7 +208,6 @@ export type Instrument = {
   marketCode: string;
   currency: string;
   eligible: boolean;
-  isBenchmark: boolean;
   marketCapMusd: number | null;
   tags: string[];
 };
@@ -308,6 +307,22 @@ export type ScoredPick = {
   ret: number | null;
 };
 
+/**
+ * The three things a month can pay for. See POINTS in lib/scoring.ts.
+ *
+ * Kept as flags rather than only a total so the tables can say *why*
+ * somebody scored — a bare "15" in a points column is a number you have
+ * to go and work out.
+ */
+export type Awards = {
+  /** The month's best portfolio return, even if that return is a loss. */
+  bestPortfolio: boolean;
+  /** Held the single best-performing pick of the month, which was up. */
+  bestStock: boolean;
+  /** Finished the month up at all. */
+  positive: boolean;
+};
+
 export type ScoredEntry = {
   uid: string;
   picks: ScoredPick[];
@@ -316,6 +331,9 @@ export type ScoredEntry = {
   total: number;
   rank: number | null;
   points: number | null;
+  awards: Awards;
+  /** The winning pick, when this entry is the one holding it. */
+  bestStockSymbol: string | null;
 };
 
 export type SeasonRow = {

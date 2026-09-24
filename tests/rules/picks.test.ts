@@ -40,7 +40,6 @@ beforeEach(async () => {
       { id: "VOLV" },
       { id: "SAAB" },
       { id: "NOKIA", eligible: false },
-      { id: "OMX", isBenchmark: true },
     ],
     rounds: [
       { id: OPEN, status: "open", locksAt: ahead(7 * 24 * 60 * MINUTE) },
@@ -81,10 +80,9 @@ describe("while a round is open", () => {
     await assertFails(setDoc(picksDoc(björn, OPEN, "anna"), picksPayload("anna", ["ERIC"])));
   });
 
-  it("refuses an ineligible instrument, and a benchmark", async () => {
+  it("refuses an ineligible instrument", async () => {
     const anna = as(env, "anna");
     await assertFails(setDoc(picksDoc(anna, OPEN, "anna"), picksPayload("anna", ["NOKIA"])));
-    await assertFails(setDoc(picksDoc(anna, OPEN, "anna"), picksPayload("anna", ["OMX"])));
   });
 
   it("refuses an instrument that does not exist", async () => {

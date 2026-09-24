@@ -80,7 +80,7 @@ export async function seed(
   env: RulesTestEnvironment,
   fixtures: {
     profiles?: SeedProfile[];
-    instruments?: { id: string; eligible?: boolean; isBenchmark?: boolean }[];
+    instruments?: { id: string; eligible?: boolean }[];
     rounds?: {
       id: string;
       status?: "open" | "live" | "settled";
@@ -98,7 +98,6 @@ export async function seed(
         handle: profile.uid,
         alias: null,
         description: null,
-        icon: "📈",
         photoUrl: null,
         status: profile.status ?? "approved",
         isAdmin: profile.isAdmin ?? false,
@@ -112,7 +111,6 @@ export async function seed(
         marketCode: "TEST",
         currency: "SEK",
         eligible: instrument.eligible ?? true,
-        isBenchmark: instrument.isBenchmark ?? false,
         marketCapMusd: null,
         tags: [],
       });

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Reveal } from "@/components/ui";
-import { POINTS, TAIL_POINTS, MAX_PICKS, WEEKS_PER_ROUND } from "@/lib/scoring";
+import { MAX_MONTHLY_POINTS, MAX_PICKS, POINTS, WEEKS_PER_ROUND } from "@/lib/scoring";
 
 export const metadata: Metadata = {
   title: "How it works",
@@ -31,16 +31,16 @@ const STEPS = [
     body: "The site is public; the league is not. Sign in, and an admin lets you in.",
   },
   {
-    title: "Pick up to five",
-    body: `Any time before the lock. Equal weight — ${MAX_PICKS} picks means a fifth each, three means a third each.`,
+    title: "Pick in the last week",
+    body: `Picking for a month opens on the last Monday of the month before. Up to ${MAX_PICKS} stocks, equal weight — five means a fifth each, three means a third each.`,
   },
   {
-    title: "Picks seal",
-    body: "Everyone's picks appear at once and the baseline price is taken.",
+    title: "Picks seal on the last weekday",
+    body: "Everyone's picks appear at once and the closing price that evening becomes the baseline.",
   },
   {
-    title: `${WEEKS_PER_ROUND} weekly checkpoints`,
-    body: "A price every seven days. The table moves once a week, not tick by tick.",
+    title: "The month runs",
+    body: `A price every seven days, and a last one when the month closes on its own final Monday — ${WEEKS_PER_ROUND} checkpoints, then the next month's picking week begins.`,
   },
 ];
 
@@ -52,6 +52,10 @@ const RULES = [
   {
     title: "Measured from the lock",
     body: "Not from the first of the month — otherwise whoever picked last could choose something that had already moved.",
+  },
+  {
+    title: "No index to beat",
+    body: "The only thing you are measured against is what the other players picked. There is no benchmark line.",
   },
   {
     title: "No size floor",
@@ -77,15 +81,14 @@ const REGIONS = [
 ];
 
 export default function InstructionsPage() {
-  const podium = POINTS.map((points, i) => ({ place: i + 1, points }));
-
   return (
     <div className="guide">
       <header className="guide-hero">
         <h1>How it works</h1>
         <p>
-          Five stocks a month. Prices are checked every week from the moment picks seal, and the
-          best return takes the points.
+          Five stocks a month, picked in the last week of the month before. Prices are checked
+          every week from the moment picks seal, and you are measured against the other players
+          and nothing else.
         </p>
         <div className="guide-chips">
           <span className="guide-chip">
@@ -95,7 +98,7 @@ export default function InstructionsPage() {
             <strong>{WEEKS_PER_ROUND}</strong> weekly checkpoints
           </span>
           <span className="guide-chip">
-            <strong>{POINTS[0]}</strong> points for a win
+            <strong>{MAX_MONTHLY_POINTS}</strong> points in a perfect month
           </span>
         </div>
       </header>
@@ -140,41 +143,47 @@ export default function InstructionsPage() {
             <table className="guide-points">
               <thead>
                 <tr>
-                  <th>Finish</th>
+                  <th>For</th>
                   <th className="right">Points</th>
                 </tr>
               </thead>
               <tbody>
-                {podium.map(({ place, points }) => (
-                  <tr key={place} className={place <= 3 ? `medal-${place}` : undefined}>
-                    <td>
-                      {place}
-                      {place === 1 ? "st" : place === 2 ? "nd" : place === 3 ? "rd" : "th"}
-                    </td>
-                    <td className="right mono">{points}</td>
-                  </tr>
-                ))}
-                <tr>
-                  <td className="secondary">Everyone else who picked</td>
-                  <td className="right mono">{TAIL_POINTS}</td>
+                <tr className="medal-1">
+                  <td>Best portfolio of the month</td>
+                  <td className="right mono">{POINTS.bestPortfolio}</td>
+                </tr>
+                <tr className="medal-2">
+                  <td>Holding the month&rsquo;s best single stock</td>
+                  <td className="right mono">{POINTS.bestStock}</td>
+                </tr>
+                <tr className="medal-3">
+                  <td>Finishing the month up</td>
+                  <td className="right mono">{POINTS.positive}</td>
                 </tr>
                 <tr>
-                  <td className="secondary">No picks submitted</td>
-                  <td className="right mono">—</td>
+                  <td className="secondary">Down, and beaten</td>
+                  <td className="right mono">0</td>
                 </tr>
               </tbody>
             </table>
 
             <div className="stack-sm">
               <p className="secondary">
-                A holding&rsquo;s return is the latest checkpoint over the baseline; your month is
-                the average across your holdings. One with no price yet is left out of that average
-                rather than counted as zero.
+                Three separate awards, so one good month can win all {MAX_MONTHLY_POINTS} and a
+                quiet one can still be worth something. Ties share rather than split — two
+                identical portfolios have both beaten the field.
               </p>
               <p className="secondary">
-                Points are awarded when an admin settles the month. OMXS30 and the S&amp;P 500 are
-                priced alongside as a reference line — they cannot be picked, and losing to them is
-                its own punishment.
+                <strong>Beating everyone always pays</strong>, even in a month where everyone is
+                down: &minus;1% against &minus;2% is still the best portfolio in the league.
+                Holding the best single stock does not work that way — a stock that fell is not
+                the month&rsquo;s best call, however much less it fell than the rest, so that
+                award goes unpaid when nothing is up.
+              </p>
+              <p className="secondary">
+                Your month is the average across your holdings; one with no price yet is left out
+                of that average rather than counted as zero. Points are awarded when an admin
+                settles the month.
               </p>
             </div>
           </div>

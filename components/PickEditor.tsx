@@ -74,7 +74,7 @@ export function PickEditor({
   const enabledMarkets = useMemo(() => new Set(markets.filter((m) => m.isEnabled).map((m) => m.code)), [markets]);
 
   const pickable = useMemo(
-    () => instruments.filter((i) => i.eligible && !i.isBenchmark && enabledMarkets.has(i.marketCode)),
+    () => instruments.filter((i) => i.eligible && enabledMarkets.has(i.marketCode)),
     [instruments, enabledMarkets],
   );
 

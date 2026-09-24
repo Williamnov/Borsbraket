@@ -110,7 +110,7 @@ async function reportStale(seeded: Set<string>): Promise<void> {
   const snapshot = await db.collection("instruments").get();
 
   const stale = snapshot.docs.filter(
-    (doc) => !seeded.has(doc.id) && doc.get("eligible") === true && doc.get("isBenchmark") !== true,
+    (doc) => !seeded.has(doc.id) && doc.get("eligible") === true,
   );
 
   if (stale.length === 0) {
@@ -158,8 +158,7 @@ async function main(): Promise<void> {
           nameLower: instrument.name.toLowerCase(),
           marketCode: instrument.marketCode,
           currency: instrument.currency,
-          isBenchmark: instrument.isBenchmark === true,
-          eligible: instrument.isBenchmark !== true,
+          eligible: true,
           marketCapMusd: null,
           tags: [],
         },

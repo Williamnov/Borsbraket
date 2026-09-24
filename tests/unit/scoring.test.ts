@@ -3,16 +3,18 @@ import {
   buildSeason,
   checkpointDueDates,
   currentCheckpoint,
+  defaultRoundShape,
   instrumentReturn,
   isPricingOpen,
-  pointsForRank,
+  lastMondayOfMonth,
+  lastWeekdayOfMonth,
   roundPhase,
   scoreRound,
   sortEntries,
   sortSeason,
   weeklyPath,
 } from "../../lib/scoring";
-import type { PicksDoc, PriceDoc, Round, ScoredEntry, SeasonRow } from "../../lib/types";
+import type { Awards, PicksDoc, PriceDoc, Round, ScoredEntry, SeasonRow } from "../../lib/types";
 
 /**
  * The scoring functions.
@@ -44,19 +46,16 @@ function price(...weeks: (number | null)[]): PriceDoc {
   };
 }
 
+/**
+ * A round on the standard schedule, so the fixtures cannot describe a
+ * calendar the app would never produce. January 2026 therefore opens on
+ * Monday 29 December 2025, locks on Wednesday 31 December, and ends on
+ * Monday 26 January 2026.
+ */
 function round(id: string, status: Round["status"] = "settled"): Round {
   const [year, month] = id.split("-").map(Number);
-  return {
-    id,
-    year,
-    month,
-    opensAt: new Date(Date.UTC(year, month - 1, 1, 6)),
-    locksAt: new Date(Date.UTC(year, month - 1, 4, 7)),
-    startsOn: `${id}-01`,
-    endsOn: `${id}-28`,
-    picksPerRound: 5,
-    status,
-  };
+  const shape = defaultRoundShape(year, month);
+  return { id, year, month, ...shape, picksPerRound: 5, status };
 }
 
 function picks(uid: string, instrumentIds: string[]): PicksDoc {
@@ -69,8 +68,24 @@ function picks(uid: string, instrumentIds: string[]): PicksDoc {
   };
 }
 
-function entry(uid: string, ret: number | null, rank: number | null, points: number | null): ScoredEntry {
-  return { uid, picks: [], ret, priced: ret === null ? 0 : 1, total: 1, rank, points };
+function entry(
+  uid: string,
+  ret: number | null,
+  rank: number | null,
+  points: number | null,
+  awards: Partial<Awards> = {},
+): ScoredEntry {
+  return {
+    uid,
+    picks: [],
+    ret,
+    priced: ret === null ? 0 : 1,
+    total: 1,
+    rank,
+    points,
+    awards: { bestPortfolio: false, bestStock: false, positive: false, ...awards },
+    bestStockSymbol: null,
+  };
 }
 
 function row(
@@ -155,19 +170,6 @@ describe("weeklyPath", () => {
   });
 });
 
-// ── pointsForRank ─────────────────────────────────────────────────────
-
-describe("pointsForRank", () => {
-  it("pays the table down to sixth", () => {
-    expect([1, 2, 3, 4, 5, 6].map(pointsForRank)).toEqual([10, 7, 5, 4, 3, 2]);
-  });
-
-  it("pays everyone below sixth a point for turning up", () => {
-    expect(pointsForRank(7)).toBe(1);
-    expect(pointsForRank(50)).toBe(1);
-  });
-});
-
 // ── scoreRound ────────────────────────────────────────────────────────
 
 describe("scoreRound", () => {
@@ -189,7 +191,83 @@ describe("scoreRound", () => {
     // The mean of +10% and −10%, not the sum.
     expect(entries[1].ret).toBeCloseTo(0, 10);
     expect(entries.map((e) => e.rank)).toEqual([1, 2]);
-    expect(entries.map((e) => e.points)).toEqual([10, 7]);
+
+    // ann takes all three: the best portfolio, the best single stock
+    // (UP, which she also holds alone) and a positive month.
+    expect(entries[0].points).toBe(17);
+    expect(entries[0].awards).toEqual({ bestPortfolio: true, bestStock: true, positive: true });
+
+    // bob holds UP too, so he shares the best-stock award — but his
+    // portfolio is flat, which is not a gain and does not win the month.
+    expect(entries[1].points).toBe(5);
+    expect(entries[1].awards).toEqual({ bestPortfolio: false, bestStock: true, positive: false });
+  });
+
+  /**
+   * The month's win goes to the least bad portfolio when every
+   * portfolio is bad. Losing by less is still the best anyone managed,
+   * and it is the one award with no floor under it.
+   */
+  it("pays the best portfolio even when it is a loss", () => {
+    const entries = scoreRound(
+      round("2026-01"),
+      [picks("ann", ["SMALL-LOSS"]), picks("bob", ["DOWN"])],
+      new Map<string, PriceDoc>([
+        ["SMALL-LOSS", price(100, 99)], // −1%
+        ["DOWN", price(100, 90)], // −10%
+      ]),
+    );
+
+    expect(entries[0].uid).toBe("ann");
+    expect(entries[0].awards.bestPortfolio).toBe(true);
+    expect(entries[0].awards.positive).toBe(false);
+    // The win, and nothing else: no stock was up, so nobody takes that.
+    expect(entries[0].awards.bestStock).toBe(false);
+    expect(entries[0].points).toBe(10);
+    expect(entries[1].points).toBe(0);
+  });
+
+  /**
+   * Unlike the portfolio award, the single-stock award has a floor. The
+   * least bad stock in a bad month is not a good call.
+   */
+  it("pays nobody for the best stock when the best stock is down", () => {
+    const entries = scoreRound(
+      round("2026-01"),
+      [picks("ann", ["DOWN"])],
+      new Map<string, PriceDoc>([["DOWN", price(100, 90)]]),
+    );
+    expect(entries[0].awards.bestStock).toBe(false);
+    expect(entries[0].bestStockSymbol).toBeNull();
+  });
+
+  it("names the winning stock on the entry holding it", () => {
+    const entries = scoreRound(round("2026-01"), [picks("ann", ["UP", "DOWN"])], prices);
+    expect(entries[0].bestStockSymbol).toBe("UP");
+  });
+
+  /**
+   * Two identical portfolios have both beaten the field, and there is
+   * no sensible tiebreak between them.
+   */
+  it("lets a tie share the win rather than splitting it", () => {
+    const entries = scoreRound(round("2026-01"), [picks("ann", ["UP"]), picks("bob", ["UP"])], prices);
+    expect(entries.map((e) => e.awards.bestPortfolio)).toEqual([true, true]);
+    expect(entries.map((e) => e.points)).toEqual([17, 17]);
+  });
+
+  it("pays a positive month that won nothing else", () => {
+    const entries = scoreRound(
+      round("2026-01"),
+      [picks("ann", ["UP"]), picks("bob", ["SMALL-GAIN"])],
+      new Map<string, PriceDoc>([
+        ["UP", price(100, 110)],
+        ["SMALL-GAIN", price(100, 101)],
+      ]),
+    );
+    const bob = entries.find((e) => e.uid === "bob");
+    expect(bob?.awards).toEqual({ bestPortfolio: false, bestStock: false, positive: true });
+    expect(bob?.points).toBe(2);
   });
 
   it("averages only the holdings that have prices", () => {
@@ -233,10 +311,19 @@ describe("buildSeason", () => {
   const rounds = [round("2026-01"), round("2026-02"), round("2026-03", "open")];
 
   const scored = new Map<string, ScoredEntry[]>([
-    ["2026-01", [entry("ann", 0.1, 1, 10), entry("bob", -0.05, 2, 7)]],
-    ["2026-02", [entry("ann", 0.2, 1, 10), entry("bob", null, null, null)]],
+    [
+      "2026-01",
+      [
+        entry("ann", 0.1, 1, 12, { bestPortfolio: true, positive: true }),
+        entry("bob", -0.05, 2, 0),
+      ],
+    ],
+    [
+      "2026-02",
+      [entry("ann", 0.2, 1, 12, { bestPortfolio: true, positive: true }), entry("bob", null, null, null)],
+    ],
     // Still open, so none of this counts.
-    ["2026-03", [entry("bob", 5, 1, 10)]],
+    ["2026-03", [entry("bob", 5, 1, 12, { bestPortfolio: true, positive: true })]],
   ]);
 
   it("compounds the monthly returns rather than adding them", () => {
@@ -245,7 +332,7 @@ describe("buildSeason", () => {
     // 1.10 × 1.20 − 1, not 0.30.
     expect(ann?.cumulative).toBeCloseTo(0.32, 10);
     expect(ann?.average).toBeCloseTo(0.15, 10);
-    expect(ann?.points).toBe(20);
+    expect(ann?.points).toBe(24);
     expect(ann?.wins).toBe(2);
     expect(ann?.played).toBe(2);
   });
@@ -254,7 +341,9 @@ describe("buildSeason", () => {
     const season = buildSeason(rounds, scored, ["ann", "bob"]);
     const bob = season.find((r) => r.uid === "bob");
     expect(bob?.played).toBe(1);
-    expect(bob?.points).toBe(7);
+    // Down in January and unpriced in February — a losing month that
+    // was also beaten now pays nothing at all.
+    expect(bob?.points).toBe(0);
     expect(bob?.cumulative).toBeCloseTo(-0.05, 10);
   });
 
@@ -263,7 +352,7 @@ describe("buildSeason", () => {
     const bob = season.find((r) => r.uid === "bob");
     // March would have made bob a winner with +500%.
     expect(bob?.wins).toBe(0);
-    expect(bob?.points).toBe(7);
+    expect(bob?.points).toBe(0);
   });
 
   it("gives a player who has never scored a row rather than nothing", () => {
@@ -334,17 +423,101 @@ describe("sortEntries", () => {
 
 // ── Checkpoints ───────────────────────────────────────────────────────
 
+describe("the standard schedule", () => {
+  it("finds the first day of a month's last week", () => {
+    // September 2026 ends on Wednesday the 30th, so its last week opens
+    // on Monday the 28th.
+    expect(lastMondayOfMonth(2026, 9).toISOString().slice(0, 10)).toBe("2026-09-28");
+    expect(lastMondayOfMonth(2026, 10).toISOString().slice(0, 10)).toBe("2026-10-26");
+    // November 2026 ends *on* a Monday, which is therefore its own last.
+    expect(lastMondayOfMonth(2026, 11).toISOString().slice(0, 10)).toBe("2026-11-30");
+  });
+
+  it("finds the last weekday, stepping back over a weekend", () => {
+    // Wednesday: the last day of the month is already a weekday.
+    expect(lastWeekdayOfMonth(2026, 9).toISOString().slice(0, 10)).toBe("2026-09-30");
+    // Saturday 31 October falls back to Friday the 30th.
+    expect(lastWeekdayOfMonth(2026, 10).toISOString().slice(0, 10)).toBe("2026-10-30");
+    // Sunday 31 January 2027 falls back to Friday the 29th.
+    expect(lastWeekdayOfMonth(2027, 1).toISOString().slice(0, 10)).toBe("2027-01-29");
+  });
+
+  it("picks in the last week of the month before, and runs through the month", () => {
+    const october = defaultRoundShape(2026, 10);
+    expect(october.opensAt.toISOString()).toBe("2026-09-28T06:00:00.000Z");
+    expect(october.locksAt.toISOString()).toBe("2026-09-30T22:00:00.000Z");
+    expect(october.startsOn).toBe("2026-09-30");
+    expect(october.endsOn).toBe("2026-10-26");
+  });
+
+  it("crosses the year end", () => {
+    const january = defaultRoundShape(2026, 1);
+    expect(january.opensAt.toISOString()).toBe("2025-12-29T06:00:00.000Z");
+    expect(january.locksAt.toISOString()).toBe("2025-12-31T22:00:00.000Z");
+    expect(january.endsOn).toBe("2026-01-26");
+  });
+
+  /**
+   * One round's last day is the next round's first, with no gap and no
+   * overlap. Under the old shape — picks on the 1st, lock on the 4th —
+   * the first three trading days of every month went unmeasured.
+   */
+  it("hands straight over from one month to the next", () => {
+    for (const [year, month] of [[2026, 10], [2026, 11], [2026, 12], [2027, 1]] as const) {
+      const nextYear = month === 12 ? year + 1 : year;
+      const nextMonth = month === 12 ? 1 : month + 1;
+      const ends = defaultRoundShape(year, month).endsOn;
+      const opens = defaultRoundShape(nextYear, nextMonth).opensAt;
+      expect(opens.toISOString().slice(0, 10)).toBe(ends);
+    }
+  });
+
+  /**
+   * A month that ends on a Monday makes the last Monday and the last
+   * weekday the same day. The window is short but it is a whole trading
+   * day, which is what the 06:00-to-22:00 hours are for.
+   */
+  it("leaves a picking window even when the two days coincide", () => {
+    // December 2026 is picked on Monday 30 November, which is both.
+    const december = defaultRoundShape(2026, 12);
+    expect(december.opensAt.toISOString()).toBe("2026-11-30T06:00:00.000Z");
+    expect(december.locksAt.toISOString()).toBe("2026-11-30T22:00:00.000Z");
+    expect(december.locksAt.getTime()).toBeGreaterThan(december.opensAt.getTime());
+  });
+});
+
 describe("checkpointDueDates", () => {
-  it("starts at the lock, then every seven days", () => {
-    // January 2026 locks on the 4th at 07:00Z.
+  it("starts at the lock, then every seven days, then the round's end", () => {
+    // January 2026 locks on Wednesday 31 December and ends on Monday
+    // 26 January, which is 26 days — so the final leg is five days
+    // rather than seven.
     const due = checkpointDueDates(round("2026-01"));
     expect(due?.map((d) => d.toISOString().slice(0, 10))).toEqual([
-      "2026-01-04",
-      "2026-01-11",
-      "2026-01-18",
-      "2026-01-25",
-      "2026-02-01",
+      "2025-12-31",
+      "2026-01-07",
+      "2026-01-14",
+      "2026-01-21",
+      "2026-01-26",
     ]);
+  });
+
+  it("keeps every checkpoint at the same hour", () => {
+    const due = checkpointDueDates(round("2026-01")) ?? [];
+    for (const date of due) expect(date.getUTCHours()).toBe(22);
+  });
+
+  /**
+   * An admin can type anything into the end date. A run of due dates
+   * that is not increasing would have currentCheckpoint reporting
+   * nonsense, so a useless one is ignored rather than trusted.
+   */
+  it("falls back to four weeks when the end date cannot be the last one", () => {
+    const base = round("2026-01");
+    const fourWeeks = "2026-01-28";
+    for (const endsOn of ["", "not-a-date", "2026-01-02"]) {
+      const due = checkpointDueDates({ ...base, endsOn });
+      expect(due?.[4].toISOString().slice(0, 10)).toBe(fourWeeks);
+    }
   });
 
   it("has nothing to say about a round with no lock", () => {
@@ -359,27 +532,27 @@ describe("currentCheckpoint", () => {
   /**
    * The baseline is the price at the lock, not the price on the 1st.
    *
-   * Picks open on the 1st and seal on the 4th. Measuring from the
-   * month's open would hand whoever submits last three days of hindsight
-   * — they could pick something that had already moved and bank a gain
-   * that happened before they chose. Everyone's baseline is now the same
-   * price at the same instant.
+   * Picking runs through the last week of December and seals on the
+   * 31st. Measuring from January's opening price would hand whoever
+   * submits last a few days of hindsight — they could pick something
+   * that had already moved and bank a gain that happened before they
+   * chose. Everyone's baseline is the same price at the same instant.
    */
   it("records nothing before the lock", () => {
-    expect(at("2026-01-01T06:00:00Z")).toBeNull();
-    expect(at("2026-01-03T23:59:00Z")).toBeNull();
-    // The first cron run of the month no longer sets the opening price
-    // just because it happens to be the first one to look.
-    expect(at("2026-01-05T06:00:00Z")).toBe(0);
+    expect(at("2025-12-29T06:00:00Z")).toBeNull();
+    expect(at("2025-12-31T21:59:00Z")).toBeNull();
+    // The first cron run after the lock is the next morning, and it
+    // reads the closing price the lock hour was chosen to wait for.
+    expect(at("2026-01-01T06:00:00Z")).toBe(0);
   });
 
   it("counts the weeks from the lock rather than from the month", () => {
-    expect(at("2026-01-04T07:00:00Z")).toBe(0);
-    expect(at("2026-01-10T23:00:00Z")).toBe(0);
-    expect(at("2026-01-11T07:00:00Z")).toBe(1);
-    expect(at("2026-01-18T07:00:00Z")).toBe(2);
-    expect(at("2026-01-25T07:00:00Z")).toBe(3);
-    expect(at("2026-02-01T07:00:00Z")).toBe(4);
+    expect(at("2025-12-31T22:00:00Z")).toBe(0);
+    expect(at("2026-01-07T21:00:00Z")).toBe(0);
+    expect(at("2026-01-08T06:00:00Z")).toBe(1);
+    expect(at("2026-01-15T06:00:00Z")).toBe(2);
+    expect(at("2026-01-22T06:00:00Z")).toBe(3);
+    expect(at("2026-01-27T06:00:00Z")).toBe(4);
   });
 
   it("stays at the last checkpoint once the month has run out", () => {
@@ -390,14 +563,14 @@ describe("currentCheckpoint", () => {
 describe("isPricingOpen", () => {
   const january = round("2026-01");
 
-  it("is shut before the lock and open through the four weeks", () => {
-    expect(isPricingOpen(january, new Date("2026-01-02T00:00:00Z"))).toBe(false);
-    expect(isPricingOpen(january, new Date("2026-01-04T07:00:00Z"))).toBe(true);
-    expect(isPricingOpen(january, new Date("2026-02-01T07:00:00Z"))).toBe(true);
+  it("is shut before the lock and open through to the end", () => {
+    expect(isPricingOpen(january, new Date("2025-12-30T00:00:00Z"))).toBe(false);
+    expect(isPricingOpen(january, new Date("2025-12-31T22:00:00Z"))).toBe(true);
+    expect(isPricingOpen(january, new Date("2026-01-27T06:00:00Z"))).toBe(true);
   });
 
   it("allows a week's grace to catch up a missed run, then closes", () => {
-    expect(isPricingOpen(january, new Date("2026-02-07T07:00:00Z"))).toBe(true);
+    expect(isPricingOpen(january, new Date("2026-02-01T07:00:00Z"))).toBe(true);
     expect(isPricingOpen(january, new Date("2026-02-20T07:00:00Z"))).toBe(false);
   });
 
@@ -405,12 +578,19 @@ describe("isPricingOpen", () => {
    * The cron prices every round inside its window, not just the newest
    * unsettled one — opening February before settling January used to
    * stop January getting checkpoints for the rest of its life.
+   *
+   * The two overlap by design now: February's picking week runs inside
+   * January's final week of scoring.
    */
   it("is open for two overlapping rounds at once", () => {
     const february = round("2026-02", "open");
-    const when = new Date("2026-02-05T07:00:00Z");
+    const when = new Date("2026-01-30T07:00:00Z");
     expect(isPricingOpen(january, when)).toBe(true);
-    expect(isPricingOpen(february, when)).toBe(true);
+    expect(isPricingOpen(february, when)).toBe(false);
+    // February starts being priced once its own picks have sealed.
+    const afterFebLock = new Date("2026-02-01T07:00:00Z");
+    expect(isPricingOpen(january, afterFebLock)).toBe(true);
+    expect(isPricingOpen(february, afterFebLock)).toBe(true);
   });
 });
 
@@ -418,13 +598,14 @@ describe("isPricingOpen", () => {
 
 describe("roundPhase", () => {
   it("reads the clock rather than a stale status field", () => {
+    // January's picking week runs through the end of December.
     const january = round("2026-01", "open");
-    expect(roundPhase(january, new Date("2026-01-02T00:00:00Z"))).toBe("open");
+    expect(roundPhase(january, new Date("2025-12-30T00:00:00Z"))).toBe("open");
     // Past the lock, still marked open in Firestore.
     expect(roundPhase(january, new Date("2026-01-20T00:00:00Z"))).toBe("live");
   });
 
   it("always reports a settled round as settled", () => {
-    expect(roundPhase(round("2026-01", "settled"), new Date("2026-01-02T00:00:00Z"))).toBe("settled");
+    expect(roundPhase(round("2026-01", "settled"), new Date("2025-12-30T00:00:00Z"))).toBe("settled");
   });
 });

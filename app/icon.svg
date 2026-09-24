@@ -1,17 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <!--
     The favicon. Same crown as components/BrandMark.tsx, shifted into a
-    square box and drawn in black rather than the masthead's grey: a
-    16-pixel tab icon has no room to be subtle, and the softer colour
-    disappeared against a light tab strip. The background stays
-    transparent so it sits on whatever the browser puts behind it.
+    square box and drawn in white on a transparent background.
 
-    The stroke is a little heavier than the masthead's for the same
-    reason — thin lines vanish first when an icon is scaled down.
+    White because the tab strip this sits in is dark, and the icon was
+    black: a black crown on a dark grey tab is a smudge. There is no way
+    to serve two icons by theme that every browser honours — prefers-
+    color-scheme inside an SVG favicon works in Firefox and Safari and
+    not in Chrome — so this picks the background it actually has to
+    survive. On a light tab strip the white outline reads as a lighter
+    mark rather than disappearing, because the crown is drawn as strokes
+    with a hollow middle rather than as a filled shape.
+
+    The stroke is a little heavier than the masthead's: thin lines
+    vanish first when an icon is scaled to sixteen pixels.
 
     Kept in step with BrandMark by hand; there are only a dozen numbers.
   -->
-  <g fill="none" stroke="#000000" stroke-width="7.5" stroke-linejoin="round" stroke-linecap="round"
+  <g fill="none" stroke="#ffffff" stroke-width="7.5" stroke-linejoin="round" stroke-linecap="round"
      transform="translate(0 15)">
     <path d="M7.5 33 L26 55 H74 L92.5 33"/>
     <rect x="11.45" y="23.45" width="19.09" height="19.09" rx="3" transform="rotate(45 21 33)"/>

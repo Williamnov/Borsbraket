@@ -659,6 +659,49 @@ html[data-player="1"] .cta-guest { display: none; }
   color: var(--ink-3);
 }
 
+/* ── Award chips ───────────────────────────────────────────────────────
+   Under a player's name in the month table: what their points were for.
+   Small and quiet — the return and the total are the figures, these are
+   the footnote that explains them. */
+
+.awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+  /* Clears the avatar, so the chips line up with the name above them
+     rather than with the picture beside it. */
+  padding-left: 38px;
+}
+
+.award {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid transparent;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.award.best {
+  color: var(--gold);
+  border-color: #e4d5a8;
+  background: #fbf7ea;
+}
+.award.stock {
+  color: var(--accent);
+  border-color: #c5d2e6;
+  background: var(--accent-soft);
+}
+.award.up {
+  color: var(--up);
+  border-color: #bfe0cb;
+  background: #f2f9f5;
+}
+
 /* ── Segmented control ─────────────────────────────────────────────────
    One row of unrelated jobs, one of them showing. Used by the admin
    panel, which was five full-height sections stacked in a column with
@@ -1985,9 +2028,23 @@ details.panel[open] > summary { background: var(--surface-sunk); }
   margin-top: clamp(var(--s7), 9vh, var(--s8));
 }
 
+/*
+ * Three rows, not three blocks of text.
+ *
+ * The tiles used to be `display: grid` with an automatic row for each
+ * line, so a caption that wrapped pushed its tile taller than the two
+ * beside it and nothing lined up across the row. Now the figure, the
+ * unit and the caption each sit in a fixed track: the numbers share a
+ * baseline, the units share one, and a caption that wraps grows into
+ * the space at the bottom instead of moving everything above it.
+ *
+ * `align-content: start` with `1fr` on the last track is what keeps the
+ * three tiles the same height whatever is in them.
+ */
 .home-figure {
   display: grid;
-  gap: 3px;
+  grid-template-rows: auto auto 1fr;
+  gap: 6px;
   padding: var(--s5);
   border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.82);
@@ -2001,26 +2058,31 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 }
 
 .home-figure strong {
-  font-size: 36px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   color: var(--accent);
+  /* Tabular even in the display face, so 4 and 12 occupy the same
+     width and the three tiles do not sit at three different offsets. */
+  font-variant-numeric: tabular-nums;
 }
 
 .home-figure-unit {
-  margin-top: 10px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
   color: var(--ink);
 }
 
 .home-figure-caption {
   font-size: 13.5px;
-  line-height: 1.45;
+  line-height: 1.4;
   color: var(--ink-3);
+  text-wrap: balance;
 }
 
 /* ── The four rules ────────────────────────────────────────────────────

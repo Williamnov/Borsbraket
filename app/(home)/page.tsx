@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Reveal } from "@/components/ui";
-import { WEEKS_PER_ROUND } from "@/lib/scoring";
+import { MAX_MONTHLY_POINTS, MAX_PICKS, WEEKS_PER_ROUND } from "@/lib/scoring";
 
 const POINTS = [
   {
@@ -11,7 +11,7 @@ const POINTS = [
   },
   {
     label: "Scoring",
-    text: "Prices are recorded once a week. Your return is the average across your holdings, measured from the opening price. Monthly finishes pay 10/7/5/4/3/2, one point for everyone else who submitted.",
+    text: "Prices are recorded once a week and your return is the average across your holdings. Points go to the best portfolio of the month, to whoever held its best single stock, and to anyone who simply finished up.",
   },
   {
     label: "Sealed picks",
@@ -24,15 +24,17 @@ const POINTS = [
 ];
 
 /**
- * The three numbers the whole game runs on, pulled straight out of the
- * prose beside them. Nothing here is a claim the rules do not already
- * make: the five is the pick limit, the four is WEEKS_PER_ROUND, and the
- * six is how many places the monthly table pays.
+ * The three numbers the whole game runs on, read from lib/scoring.ts so
+ * the page cannot drift from the rules.
+ *
+ * The captions are deliberately short and of about one length. They were
+ * a sentence each, which wrapped to two lines in some tiles and one in
+ * others and left the row looking like three unrelated cards.
  */
 const FIGURES = [
-  { figure: "5", unit: "stocks", caption: "picked at the start of each month" },
-  { figure: String(WEEKS_PER_ROUND), unit: "checkpoints", caption: "one price recorded every week" },
-  { figure: "6", unit: "places", caption: "pay 10 / 7 / 5 / 4 / 3 / 2 points" },
+  { figure: String(MAX_PICKS), unit: "stocks a month", caption: "Equal weight, no sizing" },
+  { figure: String(WEEKS_PER_ROUND), unit: "checkpoints", caption: "One price every week" },
+  { figure: String(MAX_MONTHLY_POINTS), unit: "points at stake", caption: "Three ways to score" },
 ];
 
 /**
@@ -63,9 +65,9 @@ export default function LandingPage() {
           <em>One table.</em>
         </h1>
         <p style={{ animationDelay: "220ms" }}>
-          BörsBråket is a private stock-picking league. Everyone picks up to five stocks at the
-          start of the month, prices are checked once a week, and the month&rsquo;s return decides
-          who takes the points.
+          BörsBråket is a private stock-picking league. Everyone picks up to five stocks in the
+          last week of the month, prices are checked once a week through the month that follows,
+          and the best portfolio takes the points.
         </p>
         {/* Both buttons are in the markup and CSS shows one, the same way
             the masthead decides its links. Choosing in React meant the
@@ -95,7 +97,7 @@ export default function LandingPage() {
             className="home-figure"
             style={{ animationDelay: `${420 + index * 90}ms` }}
           >
-            <strong className="mono">{item.figure}</strong>
+            <strong>{item.figure}</strong>
             <span className="home-figure-unit">{item.unit}</span>
             <span className="home-figure-caption">{item.caption}</span>
           </div>

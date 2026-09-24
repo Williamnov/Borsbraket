@@ -53,7 +53,7 @@ export function PriceGrid({
   const due = useMemo(() => dueLabels(round), [round]);
   const [bulkText, setBulkText] = useState("");
 
-  /** Everything picked this month, plus the benchmarks. */
+  /** Everything picked this month. */
   const rows = useMemo(() => {
     const ids = new Set<string>();
     for (const doc of pickDocs) for (const id of Object.keys(doc.picks ?? {})) ids.add(id);
@@ -66,9 +66,6 @@ export function PriceGrid({
       }
     }
 
-    const benchmarks = instruments.filter((i) => i.isBenchmark);
-    for (const b of benchmarks) ids.add(b.id);
-
     return [...ids]
       .map((id) => {
         const instrument = instrumentMap.get(id);
@@ -80,12 +77,11 @@ export function PriceGrid({
           symbol: instrument?.symbol ?? fallbackSymbol,
           name: instrument?.name ?? "",
           currency: instrument?.currency ?? "",
-          isBenchmark: instrument?.isBenchmark ?? false,
           holders: pickedBy.get(id) ?? 0,
         };
       })
-      .sort((a, b) => Number(a.isBenchmark) - Number(b.isBenchmark) || a.symbol.localeCompare(b.symbol));
-  }, [pickDocs, prices, instruments, instrumentMap]);
+      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  }, [pickDocs, prices, instrumentMap]);
 
   async function savePrice(instrumentId: string, symbol: string, currency: string, week: number, raw: string) {
     const value = raw.trim() === "" ? null : parseNumber(raw);
@@ -238,7 +234,6 @@ export function PriceGrid({
                       <span className="ticker" title={row.name}>
                         <strong>{row.symbol}</strong>
                       </span>
-                      {row.isBenchmark ? <span className="hint"> benchmark</span> : null}
                     </td>
                     {WEEK_FIELDS.map((field, week) => (
                       <td key={field}>
@@ -257,7 +252,7 @@ export function PriceGrid({
                     <td className="right">
                       <Value value={ret} precise />
                     </td>
-                    <td className="center mono">{row.isBenchmark ? "–" : row.holders}</td>
+                    <td className="center mono">{row.holders}</td>
                   </tr>
                 );
               })}
