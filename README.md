@@ -10,7 +10,7 @@ Five stocks, sealed until the month locks, scored against the other players.
 [Setup](SETUP.md) &nbsp;·&nbsp;
 [Status](STATUS.md)
 
-<img src="docs/preview.svg" alt="The BörsBråket landing page" width="820">
+<img src="docs/preview.png" alt="The BörsBråket landing page: a navy-to-white gradient behind the headline Five stocks. One month. One table." width="860">
 
 </div>
 
