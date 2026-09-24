@@ -55,10 +55,7 @@ export default function LandingPage() {
         until React has hydrated.
       */}
       <section className="home-hero">
-        <span className="home-eyebrow" style={{ animationDelay: "40ms" }}>
-          Invite only
-        </span>
-        <h1 style={{ animationDelay: "120ms" }}>
+        <h1 style={{ animationDelay: "60ms" }}>
           Five stocks.
           <br />
           One month.

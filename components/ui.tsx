@@ -8,24 +8,23 @@ import { useCountdown } from "@/lib/hooks";
 import type { SortDirection } from "@/lib/scoring";
 import {
   profileDescription,
-  profileIcon,
   profileInitials,
   profileTint,
   type Profile,
 } from "@/lib/types";
 
 /**
- * A player's picture, with their badge in the corner.
+ * A player's picture.
  *
  * The circle is the photo when there is one and their initials when
  * there is not — an identity either way, rather than an emoji standing
- * in for a face. The chosen icon rides on the top-right corner as a
- * badge, which is why the clipped circle and the badge are separate
- * elements: `.avatar` hides its overflow so a photo stays round, and a
- * badge inside it would be sliced in half.
+ * in for a face. The tint behind the initials is derived from the uid,
+ * so it is stable per player and nothing has to store it.
  *
- * The tint behind the initials is derived from the uid, so it is stable
- * per player and nothing has to store it.
+ * There used to be a chosen emoji riding the top-right corner as a
+ * status badge. It was forty pickable icons that meant nothing, on a
+ * page whose job is comparing returns, and it made every row in every
+ * table slightly noisier to read.
  */
 export function Avatar({
   profile,
@@ -38,7 +37,6 @@ export function Avatar({
 }) {
   const scale = size ?? (large ? "lg" : null);
   const photo = profile?.photoUrl;
-  const icon = profileIcon(profile);
   const tint = profile?.uid ? profileTint(profile.uid) : 1;
   const initials = profileInitials(displayName(profile ?? null));
 
@@ -55,7 +53,6 @@ export function Avatar({
           <span className="avatar-initials">{initials}</span>
         )}
       </span>
-      {icon ? <span className="avatar-badge">{icon}</span> : null}
     </span>
   );
 }

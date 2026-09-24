@@ -20,7 +20,7 @@ import { toDate } from "@/lib/types";
  */
 const LINKS: { href: string; label: string; scope: "all" | "player" | "admin" }[] = [
   { href: "/league", label: "League", scope: "player" },
-  { href: "/month", label: "This month", scope: "player" },
+  { href: "/month", label: "Picks", scope: "player" },
   { href: "/chat", label: "Chat", scope: "player" },
   { href: "/history", label: "History", scope: "player" },
   { href: "/instructions", label: "How it works", scope: "all" },

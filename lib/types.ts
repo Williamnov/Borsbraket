@@ -32,11 +32,6 @@ export type Profile = {
   /** A line about yourself. Replaces the old "battle cry". */
   description: string | null;
   /**
-   * A small badge in the corner of the avatar rather than the avatar
-   * itself. The picture is the identity now; this is flair on top of it.
-   */
-  icon: string;
-  /**
    * A square JPEG data URL, resized in the browser before it is saved.
    * Stored on the profile document rather than in Cloud Storage: the
    * images are a few tens of kilobytes, every reader of the league table
@@ -72,8 +67,10 @@ export type Profile = {
    * before the rename still renders. Saving a profile clears them.
    * `color` is gone entirely: the avatar's tint is derived from the uid,
    * which is one less thing to store and cannot clash with itself.
+   * `icon` and `emoji` were the status badge, which no longer exists.
    */
   motto?: string | null;
+  icon?: string;
   emoji?: string;
   color?: number;
 
@@ -85,11 +82,6 @@ export type Profile = {
    */
   email?: string;
 };
-
-/** The badge to show, tolerating documents written before the rename. */
-export function profileIcon(profile: Pick<Profile, "icon" | "emoji"> | null | undefined): string {
-  return profile?.icon || profile?.emoji || "";
-}
 
 /** The description, tolerating documents that still say `motto`. */
 export function profileDescription(

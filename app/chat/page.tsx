@@ -123,10 +123,13 @@ function Board() {
 
   return (
     <>
+      {/* The rate limit used to be explained here. It is already shown
+          in the composer at the moment it applies — "Another message in
+          12s" — and a rule you are told about before you can break it is
+          a rule in the way. */}
       <PageHead title="Chat">
-        The league&rsquo;s message board. Everyone approved can read it and post; admins can remove
-        anything. Nothing here touches the scoring. There is a {CHAT_MIN_GAP_SECONDS}-second gap
-        between messages, so an argument stays an argument rather than a wall.
+        Talk about picks. Everyone in the league can read and post, and each message can be replied
+        to once. Nothing said here affects scoring.
       </PageHead>
 
       <Composer
@@ -185,13 +188,14 @@ function Board() {
                       onSubmit={(body) => post(body, thread.root.id)}
                     />
                   ) : (
+                    /* No reply count on the button: the replies it would
+                       be counting are rendered directly above it. */
                     <button
                       type="button"
                       className="quiet small"
                       onClick={() => setReplyTo(thread.root.id)}
                     >
                       Reply
-                      {thread.replies.length > 0 ? ` · ${thread.replies.length}` : ""}
                     </button>
                   )}
                 </div>

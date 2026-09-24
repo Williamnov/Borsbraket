@@ -659,6 +659,63 @@ html[data-player="1"] .cta-guest { display: none; }
   color: var(--ink-3);
 }
 
+/* ── Segmented control ─────────────────────────────────────────────────
+   One row of unrelated jobs, one of them showing. Used by the admin
+   panel, which was five full-height sections stacked in a column with
+   nothing to say which one you had come for. */
+
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunk);
+  border: 1px solid var(--line);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* The standalone buttons lift under the pointer; a tab in a strip must
+   not, or the strip ripples as the cursor crosses it. */
+.segmented button:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--ink);
+  transform: none;
+  box-shadow: none;
+}
+
+.segmented button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.segmented-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
 /* ── Tables ────────────────────────────────────────────────────────── */
 
 .table-scroll { overflow-x: auto; }
@@ -754,10 +811,9 @@ th.center, td.center { text-align: center; }
   white-space: nowrap;
 }
 
-/* The badge has to sit outside the circle's clip, so the wrapper is what
-   positions it and .avatar keeps its overflow hidden. */
+/* Wraps the circle so the hover scale in the motion section has
+   something to act on that is not also clipping a photo. */
 .avatar-wrap {
-  position: relative;
   display: inline-flex;
   flex: 0 0 auto;
 }
@@ -800,39 +856,6 @@ th.center, td.center { text-align: center; }
 }
 .avatar.lg .avatar-initials,
 .avatar.xl .avatar-initials { font-size: 0.38em; }
-
-/* The status badge: the icon the player picked, riding the top-right
-   corner. The ring is the page background, so it reads as separate from
-   the picture underneath at any size. */
-.avatar-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  display: grid;
-  place-items: center;
-  width: 15px;
-  height: 15px;
-  border-radius: 50%;
-  background: var(--bg);
-  box-shadow: 0 0 0 1.5px var(--bg), 0 1px 3px rgba(15, 23, 42, 0.16);
-  font-size: 9px;
-  line-height: 1;
-  pointer-events: none;
-}
-.avatar-wrap.lg .avatar-badge {
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
-  top: -2px;
-  right: -2px;
-}
-.avatar-wrap.xl .avatar-badge {
-  width: 34px;
-  height: 34px;
-  font-size: 20px;
-  top: -1px;
-  right: -1px;
-}
 
 /* ── Search ────────────────────────────────────────────────────────── */
 
@@ -1432,6 +1455,42 @@ fieldset { border: 0; margin: 0; padding: 0; }
 }
 .guide-timeline li:first-child .guide-dot { background: var(--accent); }
 
+/* The market lists, as a list. They were four cards of prose, which is
+   a lot of furniture for a section people scan for one exchange name. */
+.guide-markets {
+  display: grid;
+  gap: var(--s4);
+  margin: 0;
+}
+.guide-markets > div {
+  display: grid;
+  gap: 3px;
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+.guide-markets > div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+@media (min-width: 640px) {
+  .guide-markets > div {
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: var(--s5);
+    align-items: baseline;
+  }
+}
+.guide-markets dt {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.guide-markets dd {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--ink-2);
+}
+
 .guide-split {
   display: grid;
   gap: var(--s5);
@@ -1846,31 +1905,7 @@ details.panel[open] > summary { background: var(--surface-sunk); }
   max-width: 760px;
 }
 
-.home-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 6px 15px;
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.84);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-.home-eyebrow::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
-}
-
 .home-hero h1 {
-  margin-top: var(--s5);
   font-size: clamp(40px, 7.2vw, 64px);
   font-weight: 800;
   line-height: 1.04;

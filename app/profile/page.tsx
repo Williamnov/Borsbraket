@@ -14,17 +14,9 @@ import {
   MAX_ALIAS_CHARS,
   MAX_DESCRIPTION_CHARS,
   profileDescription,
-  profileIcon,
   type Round,
   type ScoredEntry,
 } from "@/lib/types";
-
-const ICONS = [
-  "📈", "📉", "🦊", "🐻", "🐂", "🚀", "🧊", "🎲", "🦅", "🐺",
-  "🦉", "🐙", "🦁", "🐝", "🌪", "⚡️", "🔥", "🎯", "🛡", "⚓️",
-  "🧭", "🪓", "🏔", "🌲", "🍀", "☕️", "🧀", "🎣", "⛷", "🏒",
-  "👑", "💀", "🤖", "👽", "🕶", "🎩", "🧶", "🪙", "🏆", "🧠",
-];
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/heic"];
 
@@ -43,7 +35,6 @@ function ProfileEditor() {
 
   const [alias, setAlias] = useState(profile?.alias ?? "");
   const [description, setDescription] = useState(profileDescription(profile));
-  const [icon, setIcon] = useState(profileIcon(profile) || "📈");
   // The file waiting to be cropped, if any.
   const [pending, setPending] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(profile?.photoUrl ?? null);
@@ -95,8 +86,8 @@ function ProfileEditor() {
   }, [pastRounds, scored, profile]);
 
   const preview = useMemo(
-    () => (profile ? { ...profile, alias, description, icon, photoUrl } : null),
-    [profile, alias, description, icon, photoUrl],
+    () => (profile ? { ...profile, alias, description, photoUrl } : null),
+    [profile, alias, description, photoUrl],
   );
 
   /**
@@ -130,11 +121,12 @@ function ProfileEditor() {
         description: description.trim()
           ? description.trim().slice(0, MAX_DESCRIPTION_CHARS)
           : null,
-        icon,
         photoUrl,
         // Written by earlier versions. Removed on save so a profile does
-        // not carry two names for the same thing forever.
+        // not carry two names for the same thing forever. `icon` and
+        // `emoji` were the status badge, which is gone.
         motto: deleteField(),
+        icon: deleteField(),
         emoji: deleteField(),
         color: deleteField(),
       });
@@ -265,56 +257,6 @@ function ProfileEditor() {
                 {MAX_DESCRIPTION_CHARS - description.length} characters left
               </span>
             </label>
-
-            <div>
-              <span className="label" style={{ display: "block", marginBottom: 8 }}>
-                Status badge
-              </span>
-              {/* Not the avatar any more — a small mark in the corner of
-                  it, so it sits alongside a photo rather than instead of
-                  one. Choosing none leaves the corner clean. */}
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(40px, 1fr))",
-                  gap: 6,
-                }}
-              >
-                <button
-                  type="button"
-                  aria-pressed={icon === ""}
-                  aria-label="No badge"
-                  onClick={() => setIcon("")}
-                  style={{
-                    height: 38,
-                    padding: 0,
-                    fontSize: 12,
-                    color: "var(--ink-3)",
-                    borderColor: icon === "" ? "var(--accent)" : "var(--line-strong)",
-                    background: icon === "" ? "var(--accent-soft)" : "var(--surface)",
-                  }}
-                >
-                  None
-                </button>
-                {ICONS.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={option === icon}
-                    onClick={() => setIcon(option)}
-                    style={{
-                      height: 38,
-                      padding: 0,
-                      fontSize: 18,
-                      borderColor: option === icon ? "var(--accent)" : "var(--line-strong)",
-                      background: option === icon ? "var(--accent-soft)" : "var(--surface)",
-                    }}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div className="row" style={{ marginTop: 8 }}>
               <button type="button" className="primary" onClick={() => void save()} disabled={busy}>

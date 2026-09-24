@@ -147,9 +147,15 @@ function MonthView() {
           </span>
         }
       >
+        {/* What to do, rather than what the dates are. Somebody opening
+            this page in an open month wants to know they have something
+            to do and by when; the measurement window is detail, and it
+            goes second. */}
         {phase === "open"
-          ? `Picks close ${formatDate(locksAt?.toISOString())}. Measured ${round.startsOn} to ${round.endsOn}.`
-          : `Measured ${round.startsOn} to ${round.endsOn}, from the opening price to the latest weekly check.`}
+          ? `Choose up to ${maxPicks} stocks before ${formatDate(locksAt?.toISOString())}. Nobody else can see your picks until then, and you can change them as often as you like. Scored from ${round.startsOn} to ${round.endsOn}.`
+          : phase === "live"
+            ? `Picks are locked and everyone's are now visible. Prices are checked once a week, so the table moves weekly rather than tick by tick. Scored from ${round.startsOn} to ${round.endsOn}.`
+            : `Settled. Final returns and points below, measured ${round.startsOn} to ${round.endsOn}.`}
       </PageHead>
 
       <Reveal className="grid-2">
@@ -190,20 +196,21 @@ function MonthView() {
           )}
         </Panel>
 
-        <Panel title="The field">
+        <Panel title={phase === "open" ? "Who has picked" : "Everyone's picks"}>
           {phase === "open" ? (
             <div className="stack-sm">
               <p className="hint">
-                Picks stay sealed until the month locks. Until then you can only see who has
-                submitted, not what they chose.
+                Sealed until the lock — you can see who has submitted, not what they chose.
               </p>
               {profiles.map((p) => {
                 const count = submissions.get(p.uid);
                 return (
                   <div key={p.uid} className="row" style={{ justifyContent: "space-between" }}>
                     <PlayerCell profile={p} you={p.uid === profile?.uid} />
-                    <span className="hint">
-                      {count ? `${count} in` : "not submitted"}
+                    {/* A pill rather than grey text: at a glance this
+                        column should read as a list of who is ready. */}
+                    <span className={count ? "pill open" : "pill settled"}>
+                      {count ? `${count} picked` : "Waiting"}
                     </span>
                   </div>
                 );
@@ -236,8 +243,11 @@ function MonthView() {
       <Reveal delay={80}>
       <section className="panel" style={{ marginTop: 20 }}>
         <header>
-          <h2>Standings</h2>
+          <h2>This month&rsquo;s table</h2>
           <span className="grow" />
+          {/* The index lines, labelled — an unexplained "OMXS30 +2.1%"
+              beside a table of players reads as another competitor. */}
+          {benchmarks.length ? <span className="label">Index</span> : null}
           {benchmarks.map((b) => (
             <span key={b.instrument.id} className="pill">
               {b.instrument.symbol} {formatPercent(b.ret)}
@@ -246,9 +256,9 @@ function MonthView() {
         </header>
         <div className="panel-body flush table-scroll">
           {phase === "open" ? (
-            <Empty>The standings appear when the month locks.</Empty>
+            <Empty>The table appears when picks lock, and moves once a week after that.</Empty>
           ) : entries.length === 0 ? (
-            <Empty>No entries to rank.</Empty>
+            <Empty>Nobody submitted picks this month, so there is nothing to rank.</Empty>
           ) : (
             <table>
               <thead>

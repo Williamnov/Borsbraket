@@ -38,7 +38,7 @@ type Target =
 
 const PAGES: { href: string; label: string; hint: string; admin?: boolean }[] = [
   { href: "/league", label: "League", hint: "The season table" },
-  { href: "/month", label: "This month", hint: "Picks and standings" },
+  { href: "/month", label: "Picks", hint: "Make your picks and see this month's table" },
   { href: "/chat", label: "Chat", hint: "The message board" },
   { href: "/history", label: "History", hint: "Every settled month" },
   { href: "/instructions", label: "How it works", hint: "The rules" },
