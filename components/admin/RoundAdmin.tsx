@@ -42,6 +42,29 @@ export function RoundAdmin({
     setMessage(null);
   }, [round?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Fill the three date fields from the standard schedule.
+   *
+   * Existing rounds keep whatever dates they were created with, so
+   * changing the schedule in code does nothing to a month that already
+   * exists. This is how you move one onto it without working out the
+   * last Monday of a month by hand and typing a datetime.
+   *
+   * It only fills the form — nothing is written until Save round, so
+   * you can see what it is proposing before agreeing to it.
+   */
+  function useStandardSchedule() {
+    if (!round) return;
+    const shape = defaultRoundShape(round.year, round.month);
+    setLocksAt(toLocalInput(shape.locksAt));
+    setStartsOn(shape.startsOn);
+    setEndsOn(shape.endsOn);
+    setMessage({
+      kind: "good",
+      text: `Picking opens the last Monday of the month before and closes ${shape.locksAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}; the month ends ${new Date(`${shape.endsOn}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}. Save to apply.`,
+    });
+  }
+
   async function saveRound() {
     if (!round) return;
     setBusy(true);
@@ -207,6 +230,9 @@ export function RoundAdmin({
             <div className="row" style={{ marginTop: 16 }}>
               <button type="button" onClick={() => void saveRound()} disabled={busy}>
                 Save round
+              </button>
+              <button type="button" className="quiet" onClick={useStandardSchedule} disabled={busy}>
+                Use the standard schedule
               </button>
               <button
                 type="button"
