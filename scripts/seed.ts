@@ -8,9 +8,27 @@
  *
  *   npm run seed
  *   npm run seed -- --admin you@example.com
+ *   npm run seed -- --retire          # see below
  *
  * The email is passed on the command line on purpose — it never gets
  * committed to the repository.
+ *
+ * ── What a merge cannot do ────────────────────────────────────────────
+ *
+ * Merging only ever adds. That is the right default — a picked
+ * instrument must not vanish from under a settled month — but it means
+ * Firestore keeps everything the universe has ever contained, and the
+ * universe moves: Nasdaq reshuffles its segments every year, so a
+ * company promoted from Small Cap to Mid Cap leaves a document behind
+ * under the segment it left, pickable, under a heading that is now
+ * wrong. Companies are also taken over and delisted.
+ *
+ * So the last thing this does is name every instrument in Firestore that
+ * the universe no longer contains. It changes nothing by default,
+ * because a name that is merely missing from the seed might have been
+ * added by hand from the admin panel on purpose. `--retire` marks them
+ * ineligible — never deleted, because past picks point at them — and
+ * prints each one as it goes.
  */
 
 import { readFileSync } from "node:fs";
@@ -80,6 +98,44 @@ async function commitInChunks(
   console.log(`  ${entries.length} ${describe}`);
 }
 
+/**
+ * Everything in Firestore that the universe no longer lists.
+ *
+ * Reported always, acted on only with --retire. An instrument that is
+ * already ineligible is left alone and not counted: it has been dealt
+ * with, by this or by a person in the admin panel.
+ */
+async function reportStale(seeded: Set<string>): Promise<void> {
+  const retire = process.argv.includes("--retire");
+  const snapshot = await db.collection("instruments").get();
+
+  const stale = snapshot.docs.filter(
+    (doc) => !seeded.has(doc.id) && doc.get("eligible") === true && doc.get("isBenchmark") !== true,
+  );
+
+  if (stale.length === 0) {
+    console.log("\n  Nothing in Firestore that the universe has dropped.");
+    return;
+  }
+
+  console.log(`\n  ${stale.length} instrument(s) in Firestore that the universe no longer lists:`);
+  for (const doc of stale) {
+    console.log(`    ${doc.id}  ${String(doc.get("name") ?? "")}`);
+  }
+
+  if (!retire) {
+    console.log("\n  Left alone. Re-run with --retire to mark them ineligible,");
+    console.log("  or block them one at a time in the admin panel.");
+    return;
+  }
+
+  const entries: [DocumentReference, Record<string, unknown>][] = stale.map((doc) => [
+    doc.ref,
+    { eligible: false },
+  ]);
+  await commitInChunks(entries, "marked ineligible");
+}
+
 async function main(): Promise<void> {
   console.log("Seeding BörsBråket…");
 
@@ -116,6 +172,8 @@ async function main(): Promise<void> {
     .doc("settings/league")
     .set({ leagueName: "BörsBråket", picksPerRound: 5, minMarketCapMusd: 0 }, { merge: true });
   console.log("  league settings");
+
+  await reportStale(new Set(INSTRUMENTS.map((i) => instrumentId(i.marketCode, i.symbol))));
 
   const adminEmail = adminEmailArg();
   if (adminEmail) {

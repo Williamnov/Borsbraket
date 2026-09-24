@@ -5,17 +5,25 @@
  * exchanges, the large continental European venues and Tokyo and Sydney.
  * Disable a market in the admin panel to close it.
  *
- * INSTRUMENTS is the hand-kept part: the large caps and the main
- * international venues, where the listing is unambiguous and changes
- * rarely. The Stockholm segment lists — Mid Cap, Small Cap, First North
- * and Spotlight — come from universe.generated.ts, which is produced by
- * scripts/resolve-tickers.mjs from published index membership. Six
- * hundred names is not something to type.
+ * INSTRUMENTS has two halves.
+ *
+ * **Every Nordic market** comes from universe.generated.ts, which
+ * scripts/build-universe.mjs takes from the exchanges themselves —
+ * Nasdaq's Nordic screener for the main-market segments and First North
+ * of all four countries, NGM's and Spotlight's own APIs for the Swedish
+ * growth venues, and Euronext's product directory for the three Oslo
+ * lists. Sixteen hundred names is not something to type, and segment
+ * membership is not something to guess at: the exchange decides it and
+ * reshuffles it annually, so the only trustworthy list is the one it
+ * publishes. Re-run the script to refresh it.
+ *
+ * **Everything else** is hand-kept below: the main international venues,
+ * where the listing is unambiguous and changes rarely.
  *
  * Nothing can be picked that is not in this collection.
  */
 
-import { STOCKHOLM_SEGMENTS } from "./universe.generated";
+import { NORDIC_LISTINGS } from "./universe.generated";
 
 export type MarketSeed = {
   code: string;
@@ -100,73 +108,24 @@ function list(marketCode: string, currency: string, rows: [string, string][]): I
 }
 
 export const INSTRUMENTS: InstrumentSeed[] = [
-  ...list("SE_LARGE", "SEK", [
-    ["ABB", "ABB"], ["AAK", "AAK"], ["ADDT B", "Addtech B"], ["ALFA", "Alfa Laval"],
-    ["ASSA B", "Assa Abloy B"], ["ATCO A", "Atlas Copco A"], ["ATCO B", "Atlas Copco B"],
-    ["AXFO", "Axfood"], ["AZN", "AstraZeneca"], ["BEIJ B", "Beijer Ref B"], ["BOL", "Boliden"],
-    ["CAST", "Castellum"], ["DOM", "Dometic Group"], ["ELUX B", "Electrolux B"],
-    ["EPI A", "Epiroc A"], ["EPI B", "Epiroc B"], ["EQT", "EQT"], ["ERIC B", "Ericsson B"],
-    ["ESSITY B", "Essity B"], ["EVO", "Evolution"], ["FABG", "Fabege"], ["GETI B", "Getinge B"],
-    ["HEXA B", "Hexagon B"], ["HM B", "H&M B"], ["HOLM B", "Holmen B"], ["HUSQ B", "Husqvarna B"],
-    ["INDT", "Indutrade"], ["INDU C", "Industrivärden C"], ["INVE B", "Investor B"],
-    ["KINV B", "Kinnevik B"], ["LATO B", "Investment AB Latour B"], ["LIFCO B", "Lifco B"],
-    ["LOOMIS", "Loomis"], ["NCC B", "NCC B"], ["NDA SE", "Nordea Bank"],
-    ["NIBE B", "Nibe Industrier B"], ["PEAB B", "Peab B"], ["SAAB B", "Saab B"],
-    ["SAGA B", "Sagax B"], ["SAND", "Sandvik"], ["SCA B", "SCA B"], ["SEB A", "SEB A"],
-    ["SECU B", "Securitas B"], ["SHB A", "Handelsbanken A"], ["SKA B", "Skanska B"],
-    ["SKF B", "SKF B"], ["SOBI", "Swedish Orphan Biovitrum"], ["SSAB B", "SSAB B"],
-    ["SWEC B", "Sweco B"], ["SWED A", "Swedbank A"], ["TEL2 B", "Tele2 B"],
-    ["TELIA", "Telia Company"], ["THULE", "Thule Group"], ["TREL B", "Trelleborg B"],
-    ["VOLCAR B", "Volvo Car B"], ["VOLV B", "Volvo B"],
-  ]),
-
   /*
-   * The Stockholm segment lists — Mid Cap, Small Cap, First North and
-   * Spotlight — live in universe.generated.ts, because they are six
-   * hundred names and nobody should be typing those.
+   * Every Nordic list, from the exchange that publishes it: the four
+   * Nasdaq countries' Large, Mid and Small Cap segments and their First
+   * North markets, NGM's two segments, Spotlight, and Oslo Børs with
+   * Euronext Expand and Growth beside it.
    *
-   * They are produced by scripts/resolve-tickers.mjs, which takes the
-   * published index membership in scripts/data/ and matches it against
-   * real Stockholm listings to get a ticker for each. Anything that does
-   * not match cleanly is printed rather than guessed at, because a wrong
-   * ticker does not fail — it quietly prices a different company for
-   * somebody's month.
+   * This used to be a hand-typed large cap list per country and nothing
+   * below it, which is why Helsinki, Copenhagen, Reykjavík and the
+   * growth venues were empty. It is generated now — see the note at the
+   * top of this file, and scripts/build-universe.mjs for where each
+   * market comes from.
    *
    * ShaMaran is the one worth knowing about: it trades as a Swedish
    * depository receipt, so its symbol carries "SDB". The existing
    * convention handles it, because a space becomes a hyphen on the way
    * to the feed exactly as it does for the B-shares.
    */
-  ...STOCKHOLM_SEGMENTS,
-
-  ...list("FI_LARGE", "EUR", [
-    ["ELISA", "Elisa"], ["FORTUM", "Fortum"], ["KESKOB", "Kesko B"], ["KNEBV", "Kone B"],
-    ["METSO", "Metso"], ["NESTE", "Neste"], ["NOKIA", "Nokia"], ["ORNBV", "Orion B"],
-    ["SAMPO", "Sampo A"], ["STERV", "Stora Enso R"], ["TYRES", "Nokian Tyres"],
-    ["UPM", "UPM-Kymmene"], ["WRT1V", "Wärtsilä B"],
-  ]),
-
-  ...list("DK_LARGE", "DKK", [
-    ["AMBU B", "Ambu B"], ["CARL B", "Carlsberg B"], ["COLO B", "Coloplast B"],
-    ["DEMANT", "Demant"], ["DSV", "DSV"], ["GMAB", "Genmab"],
-    ["MAERSK B", "A.P. Møller-Mærsk B"], ["NOVO B", "Novo Nordisk B"], ["NSIS B", "Novonesis B"],
-    ["ORSTED", "Ørsted"], ["PNDORA", "Pandora"], ["RBREW", "Royal Unibrew"], ["TRYG", "Tryg"],
-    ["VWS", "Vestas Wind Systems"],
-  ]),
-
-  ...list("NO_OSE", "NOK", [
-    ["AKER", "Aker"], ["AKRBP", "Aker BP"], ["DNB", "DNB Bank"], ["EQNR", "Equinor"],
-    ["FRO", "Frontline"], ["GJF", "Gjensidige Forsikring"], ["KOG", "Kongsberg Gruppen"],
-    ["MOWI", "Mowi"], ["NHY", "Norsk Hydro"], ["ORK", "Orkla"], ["SALM", "SalMar"],
-    ["SCHA", "Schibsted A"], ["STB", "Storebrand"], ["SUBC", "Subsea 7"], ["TEL", "Telenor"],
-    ["TOM", "Tomra Systems"], ["YAR", "Yara International"],
-  ]),
-
-  ...list("IS_LARGE", "ISK", [
-    ["ARION", "Arion banki"], ["BRIM", "Brim"], ["EIM", "Eimskip"], ["FESTI", "Festi"],
-    ["HAGA", "Hagar"], ["ICEAIR", "Icelandair Group"], ["KVIKA", "Kvika banki"],
-    ["SIMINN", "Síminn"], ["SJOVA", "Sjóvá-Almennar"],
-  ]),
+  ...NORDIC_LISTINGS,
 
   ...list("US_NYSE", "USD", [
     ["ABBV", "AbbVie"], ["ABT", "Abbott Laboratories"], ["ACN", "Accenture"],

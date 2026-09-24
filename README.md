@@ -25,9 +25,14 @@ Measuring from the lock rather than the 1st is deliberate. If the baseline were 
 price, whoever submitted last would have seen three days of trading and could pick something that
 had already moved. Sealing and measuring at the same instant gives everyone one starting price.
 
-**Where you can pick from:** every Nordic list — Sweden, Finland, Denmark, Norway, Iceland — the
-main North American and UK markets, the large continental European venues (Xetra, Paris, SIX,
-Amsterdam, Madrid, Milan), and Tokyo and Sydney.
+**Where you can pick from:** every Nordic list — Large, Mid and Small Cap and First North in
+Stockholm, Helsinki, Copenhagen and Reykjavík, Spotlight and NGM's two markets beside them, and Oslo
+Børs with Euronext Expand and Growth — plus the main North American and UK markets, the large
+continental European venues (Xetra, Paris, SIX, Amsterdam, Madrid, Milan), and Tokyo and Sydney.
+
+The Nordic half of that is not maintained by hand. Each of those exchanges publishes its own current
+listing, segment by segment, and `scripts/build-universe.mjs` takes it from them — so Mid Cap means
+what Nasdaq says it means this year, and nothing is typed, matched or guessed at.
 
 **Finding a stock** works two ways, and the difference is a read cost rather than a preference.
 Choose a market and the picker loads that market, so the search box filters a list already in your
@@ -76,6 +81,20 @@ npm test             # the scoring functions
 npm run test:rules   # firestore.rules against the emulator
 npm run build
 ```
+
+Refreshing the Nordic universe — worth doing when the exchanges reshuffle their segments, which
+Nasdaq does once a year:
+
+```bash
+npm run universe                           # ask the exchanges, report, change nothing
+npm run universe -- --write                # rewrite lib/universe.generated.ts
+npm run seed                               # and put it in Firestore
+npm run seed -- --retire                   # ...including retiring what is no longer listed
+```
+
+Read the report before writing. It names what moved between segments, what was renamed and what has
+stopped being listed anywhere, which is the part worth a second of attention: a seed only ever adds,
+so a company that changes segment leaves a document behind under the segment it left.
 
 ## A note on secrets
 
