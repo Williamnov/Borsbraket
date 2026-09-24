@@ -59,9 +59,15 @@ service cloud.firestore {
     // A missing instrument makes get(...).data fail, which denies the
     // write. That is the desired outcome: you cannot invent a ticker.
 
+    // `eligible` is the whole test now. It used to also require
+    // isBenchmark == false, which was both redundant — a benchmark was
+    // seeded ineligible — and a trap: a rules expression that names a
+    // field the document does not have fails the whole write, so the
+    // day the field stopped being written was the day every newly
+    // seeded instrument became unpickable. The emulator suite caught
+    // it; nothing in the app would have.
     function instrumentOk(id) {
-      return get(/databases/$(database)/documents/instruments/$(id)).data.eligible == true
-          && get(/databases/$(database)/documents/instruments/$(id)).data.isBenchmark == false;
+      return get(/databases/$(database)/documents/instruments/$(id)).data.eligible == true;
     }
 
     // Rules have no loops. Five picks is the hard ceiling, so the five
@@ -111,6 +117,11 @@ service cloud.firestore {
           || (data[field] is string && data[field].size() <= limit);
     }
 
+    // `icon` was the status badge, which no longer exists: the app
+    // deletes the field on save and never writes it. The cap stays
+    // because textOk tolerates an absent field, so it costs nothing and
+    // still bounds the one thing that could write one — a tab left open
+    // on an older build.
     function profileTextOk(data) {
       return textOk(data, 'description', 140)
           && textOk(data, 'alias', 24)
