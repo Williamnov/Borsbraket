@@ -131,9 +131,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ maxWidth: 420, margin: "56px auto 0" }}>
+    <div className="gate">
       <h1>Sign in</h1>
-      <p className="secondary" style={{ marginTop: 8, marginBottom: 24 }}>
+      <p className="secondary" style={{ marginBottom: 24 }}>
         New accounts need an admin&rsquo;s approval before they can pick. Signing in is the first
         step — you will land in the waiting room until you are let in.
       </p>

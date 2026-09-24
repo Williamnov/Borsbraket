@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { PickEditor } from "@/components/PickEditor";
 import {
+  Countdown,
   Empty,
   PageHead,
   Panel,
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui";
 import {
   useBenchmarks,
-  useCountdown,
   useInstrumentSearch,
   useMarketInstruments,
   useMyPicks,
@@ -92,7 +92,6 @@ function MonthView() {
   const phase = round ? roundPhase(round) : null;
   const locked = phase !== "open";
   const locksAt = round ? toDate(round.locksAt) : null;
-  const countdown = useCountdown(phase === "open" ? locksAt : null);
 
   const { myPicks } = useMyPicks(round?.id ?? null, profile?.uid ?? null);
   const { pickDocs } = useRoundPicks(round?.id ?? null, locked);
@@ -142,9 +141,9 @@ function MonthView() {
         action={
           <span className="row">
             <StatusPill phase={phase} />
-            {phase === "open" && countdown ? (
-              <span className="hint">Locks in {countdown}</span>
-            ) : null}
+            {/* Owns its own ticking state, so the clock does not
+                re-render the picker and both tables once a second. */}
+            <Countdown target={phase === "open" ? locksAt : null} />
           </span>
         }
       >

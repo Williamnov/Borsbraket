@@ -31,9 +31,14 @@ const sans = Inter({
  * at 13px in a table, and the two are near enough in proportion that the
  * switch between them is not something you notice.
  */
+/*
+ * No `weight` list on purpose. Plus Jakarta Sans is a variable font, and
+ * naming weights makes next/font fetch a static instance per weight —
+ * four files where the variable one covers 200 to 800 in a single
+ * request of about the same size as one of them.
+ */
 const display = Plus_Jakarta_Sans({
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
   display: "swap",
   variable: "--font-display-face",
 });
@@ -61,9 +66,14 @@ const brand = Poppins({
   variable: "--font-brand-face",
 });
 
+/*
+ * Not a variable font, so every weight here is another file. The page
+ * uses exactly two — 400 for plain figures, 600 for the ones that are
+ * the point of their row — and 500 was listed without ever being set.
+ */
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "600"],
   display: "swap",
   variable: "--font-mono-face",
 });

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { direction, displayName, formatPercent } from "@/lib/format";
+import { useCountdown } from "@/lib/hooks";
 import type { SortDirection } from "@/lib/scoring";
 import {
   profileDescription,
@@ -126,6 +127,24 @@ export function WeekBars({
 export function StatusPill({ phase }: { phase: "open" | "live" | "settled" }) {
   const label = phase === "open" ? "Open for picks" : phase === "live" ? "Running" : "Settled";
   return <span className={`pill ${phase}`}>{label}</span>;
+}
+
+/**
+ * "Locks in 3d 4h", ticking.
+ *
+ * A component rather than a call to useCountdown in the page, because
+ * the state has to live somewhere and wherever it lives re-renders. In
+ * the month page that meant the picker — with a market's worth of
+ * instruments in it — and both tables were re-rendered on every tick of
+ * a clock that is displaying six characters in the page header.
+ *
+ * Renders nothing when there is no deadline, so the caller does not
+ * need to guard it.
+ */
+export function Countdown({ target }: { target: Date | null }) {
+  const label = useCountdown(target);
+  if (!label) return null;
+  return <span className="hint">Locks in {label}</span>;
 }
 
 export function Empty({ children }: { children: ReactNode }) {

@@ -573,17 +573,7 @@ export function useContacts(enabled: boolean) {
   return { emails, loading, error };
 }
 
-/** Countdown that re-renders once a second. */
-export function useCountdown(target: Date | null): string {
-  const [, tick] = useState(0);
-
-  useEffect(() => {
-    if (!target) return;
-    const id = setInterval(() => tick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [target]);
-
-  if (!target) return "";
+function countdownLabel(target: Date): string {
   const ms = target.getTime() - Date.now();
   if (ms <= 0) return "closed";
   const days = Math.floor(ms / 86_400_000);
@@ -593,4 +583,57 @@ export function useCountdown(target: Date | null): string {
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h ${minutes}m`;
   return `${minutes}m ${seconds}s`;
+}
+
+/**
+ * Time until a deadline, as a string that updates itself.
+ *
+ * It ticks as coarsely as the label it is producing. For most of a
+ * month that label is "12d 4h", whose smallest unit changes once an
+ * hour — so waking up every second to recompute the same six characters
+ * is pure waste. Under an hour the label starts counting seconds and
+ * the tick follows it down.
+ *
+ * Use it through <Countdown> rather than directly. A page that calls
+ * this at the top re-renders all of itself on every tick, which is how
+ * the month page came to re-render a picker holding three hundred
+ * instruments once a second for the whole time a round was open.
+ */
+export function useCountdown(target: Date | null): string {
+  // Empty until the effect runs, so nothing here is computed during a
+  // render and there is no clock-dependent output to hydrate against.
+  const [label, setLabel] = useState("");
+
+  // The epoch value, not the Date. Callers build theirs from the round
+  // document on every render, so a new object arrives each time and an
+  // effect keyed on identity would tear its own timer down and build a
+  // new one on every tick — which, with the old fixed interval, is
+  // exactly what kept the whole month page re-rendering.
+  const at = target?.getTime() ?? null;
+
+  useEffect(() => {
+    if (at === null) {
+      setLabel("");
+      return;
+    }
+
+    const deadline = new Date(at);
+    let timer = 0;
+
+    const tick = () => {
+      const now = Date.now();
+      setLabel(countdownLabel(deadline));
+      if (at - now <= 0) return;
+
+      // Land just after the next boundary of whatever the smallest unit
+      // on screen currently is, rather than on a fixed interval.
+      const unit = at - now >= 3_600_000 ? 60_000 : 1_000;
+      timer = window.setTimeout(tick, unit - (now % unit) + 20);
+    };
+
+    tick();
+    return () => window.clearTimeout(timer);
+  }, [at]);
+
+  return label;
 }

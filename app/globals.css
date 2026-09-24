@@ -134,7 +134,10 @@ body {
   font-feature-settings: "cv05" 1, "cv11" 1;
   letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+  /* No text-rendering: optimizeLegibility. It forces kerning and
+     ligature lookups over the whole document before first paint, and on
+     a page whose faces already ship sensible kerning it buys nothing for
+     a measurable delay on a long table. */
 
   /* Keeps the site footer on the floor of short pages instead of
      floating halfway up. */
@@ -253,7 +256,18 @@ a:hover { text-decoration: underline; }
   z-index: 20;
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: saturate(170%) blur(14px);
+  /*
+   * The one blur on the page.
+   *
+   * backdrop-filter is re-rasterised whenever what is behind it moves,
+   * which on a sticky bar means every scrolled frame. One of them is a
+   * fair price for a bar you can read a table through; four of them —
+   * this, the hero's chip, its outline button and the three figure
+   * tiles, all of which also scroll — was most of a frame budget on a
+   * laptop, for an effect nobody could point at. The rest are plain
+   * translucent fills now.
+   */
+  backdrop-filter: saturate(160%) blur(10px);
   transition:
     box-shadow 0.28s ease,
     border-color 0.28s ease,
@@ -434,6 +448,26 @@ a:hover { text-decoration: underline; }
 
 .nav {
   min-width: 0;
+  transition: opacity 0.22s ease, visibility 0.22s;
+}
+
+/*
+ * The tabs get out of the way while the search is open.
+ *
+ * The field is laid over them and used to rely on being opaque to hide
+ * them — which worked for exactly as long as every masthead was white.
+ * Over the landing page's navy the field is glass, and the tabs read
+ * straight through it: two sets of words in the same box.
+ *
+ * Hiding them is the more honest fix anyway, and it is free: `opacity`
+ * and `visibility` are not layout, so the bar does not move, which is
+ * the one thing this part of the masthead has always had to guarantee.
+ * `visibility: hidden` also takes the covered links out of the tab order
+ * and off the screen reader, which the opaque version never did.
+ */
+.masthead-mid:has(.search.is-open) .nav {
+  opacity: 0;
+  visibility: hidden;
 }
 
 .nav-links {
@@ -846,12 +880,14 @@ html[data-player="1"] .search { display: inline-flex; }
  * wrapped and unwrapped its way through the gesture.
  *
  * It is full width from the start and revealed by moving the left edge
- * of a clip, so it wipes leftwards across the tabs and covers them where
- * they stand. clip-path is painted, not laid out, so this costs no
- * layout on any frame. A width animation would have looked the same and
- * reflowed the text inside it the whole way.
+ * of a clip, so it wipes leftwards across the space the tabs occupy.
+ * clip-path is painted, not laid out, so this costs no layout on any
+ * frame. A width animation would have looked the same and reflowed the
+ * text inside it the whole way.
  *
- * Opaque, obviously — it is covering something.
+ * It does not have to be opaque: the tabs underneath fade out as it
+ * opens — see .masthead-mid:has(.search.is-open) above — which is what
+ * lets the field be glass over the landing page's navy.
  */
 .search-field {
   position: absolute;
@@ -1585,7 +1621,15 @@ th.sortable.is-sorted .sort-button { color: var(--accent); }
   border-top: 1px solid var(--line);
 }
 
-/* ── Motion ────────────────────────────────────────────────────────── */
+/* ── Motion ────────────────────────────────────────────────────────────
+   Small, cheap, and all of it optional. Nothing here moves layout —
+   everything animates transform, opacity or colour, so a slow device
+   drops the effect rather than the frame rate, and the block at the foot
+   of this file turns the lot off for anyone who has asked for less
+   movement.
+
+   There were two of these sections, with four rules written out twice
+   and a reduced-motion block stranded between them. This is the one. */
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
@@ -1627,6 +1671,86 @@ details.panel > summary:hover { background: var(--surface-sunk); }
 details.panel[open] > summary { background: var(--surface-sunk); }
 
 .notice { animation: rise 0.28s ease both; }
+
+/* The unread count arrives rather than appearing. */
+.nav-badge { animation: badge-in 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes badge-in {
+  from { opacity: 0; transform: scale(0.5); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Loading states breathe instead of sitting there as dead text, so a
+   slow month of prices reads as "working" rather than "broken". */
+.empty { animation: breathe 1.8s ease-in-out infinite; }
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Returns fade between red and green as prices land, rather than
+   snapping — the table updates once a week and the change is worth
+   noticing. */
+.value { transition: color 0.3s ease; }
+
+/* ── The wash behind every other page ──────────────────────────────────
+ *
+ * The pale end of the landing page's sky, and the thing that ties the
+ * two together. It is about as strong as a sheet of paper laid on a
+ * blue desk: you would not call the page blue, but the panels on it now
+ * have something to sit on, and arriving from the landing page no
+ * longer feels like arriving somewhere else.
+ *
+ * It stops short of the first table on every page, which is deliberate
+ * — a tint behind a column of returns is a tint arguing with the
+ * numbers. See components/Backdrop.tsx.
+ */
+
+.page-sky {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 420px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 340px at 88% -30%, rgba(27, 58, 107, 0.07), rgba(27, 58, 107, 0) 70%),
+    linear-gradient(180deg, #edf2f8 0%, #f4f7fb 38%, #fbfcfe 70%, #ffffff 100%);
+}
+
+/* The page title, with the landing page's fading hairline under it
+   rather than a rule that runs wall to wall. */
+.page-head {
+  position: relative;
+}
+.page-head::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--line-strong), rgba(211, 220, 231, 0) 72%);
+}
+
+/* ── The front door ────────────────────────────────────────────────────
+   Signing in and the waiting room. Both are one short column read by
+   somebody who has just stepped off the landing page, so they get the
+   same treatment it would give them: a card floating on the wash rather
+   than a paragraph on a bare sheet. */
+
+.gate {
+  max-width: 440px;
+  margin: clamp(36px, 7vh, 64px) auto 0;
+  padding: var(--s6);
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lift);
+}
+.gate.wide { max-width: 560px; }
+.gate h1 { font-size: 27px; }
+.gate > p { margin-top: var(--s3); color: var(--ink-2); }
 
 /* ── The landing page ──────────────────────────────────────────────────
  *
@@ -1728,9 +1852,8 @@ details.panel[open] > summary { background: var(--surface-sunk); }
   gap: 9px;
   padding: 6px 15px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(8px);
   color: rgba(255, 255, 255, 0.84);
   font-size: 11px;
   font-weight: 700;
@@ -1803,10 +1926,9 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 }
 
 .button.ghost {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.09);
   border-color: rgba(255, 255, 255, 0.32);
   color: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(8px);
 }
 .button.ghost:hover {
   background: rgba(255, 255, 255, 0.16);
@@ -1816,9 +1938,10 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 
 /* ── The three figures ─────────────────────────────────────────────────
    These sit across the join, where the sky has gone pale but has not
-   finished. A translucent white tile with a blur behind it keeps them on
-   one surface all the way across that change, which a solid fill in any
-   single colour would not. */
+   finished. A translucent white tile keeps them on one surface all the
+   way across that change, which a solid fill in any single colour would
+   not. There is nothing behind them but a smooth gradient, so the blur
+   they used to carry was softening detail that does not exist. */
 
 .home-figures {
   display: grid;
@@ -1832,9 +1955,8 @@ details.panel[open] > summary { background: var(--surface-sunk); }
   gap: 3px;
   padding: var(--s5);
   border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px) saturate(150%);
   box-shadow: 0 24px 56px -34px rgba(9, 25, 48, 0.6);
   transition: transform var(--quick) var(--ease), box-shadow var(--quick) ease;
 }
@@ -1943,95 +2065,6 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 
 .byline { font-weight: 500; }
 
-@media (prefers-reduced-motion: reduce) {
-  /* Pseudo-elements too: the landing page's drifting light is one, and a
-     duration cap that does not reach it would leave the only moving
-     thing on the page still moving. The delay has to go as well, or the
-     staggered hero arrives instantly but a third of a second late. */
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.001ms !important;
-    animation-delay: 0s !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.001ms !important;
-  }
-
-  /* Everything above is decoration. Anyone who has asked for less motion
-     gets the finished state immediately, never a fade they have to wait
-     out — and never a block that is still invisible. */
-  .reveal { opacity: 1 !important; transform: none !important; }
-  .player:hover .avatar-wrap,
-  button:active:not(:disabled),
-  .button:active { transform: none !important; }
-}
-
-/* ── Motion ────────────────────────────────────────────────────────────
-   Small, cheap, and all of it optional. Nothing here moves layout —
-   everything animates transform, opacity or colour, so a slow device
-   drops the effect rather than the frame rate, and the last block turns
-   the lot off for anyone who has asked for less movement. */
-
-/* Buttons take the press. A control that does not acknowledge a click
-   feels broken on a slow connection, where the result is a round trip
-   away. */
-button:active:not(:disabled),
-.button:active {
-  transform: translateY(1px);
-}
-
-/* The unread count arrives rather than appearing. */
-.nav-badge {
-  animation: badge-in 0.26s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-}
-
-@keyframes badge-in {
-  from { opacity: 0; transform: scale(0.5); }
-  to { opacity: 1; transform: none; }
-}
-
-/* Loading states breathe instead of sitting there as dead text, so a
-   slow month of prices reads as "working" rather than "broken". */
-.empty {
-  animation: breathe 1.8s ease-in-out infinite;
-}
-
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-
-/* Returns fade between red and green as prices land, rather than
-   snapping — the table updates once a week and the change is worth
-   noticing. */
-.value {
-  transition: color 0.3s ease;
-}
-
-/* Panels lift a hair under the pointer where they are clickable. */
-.chat-thread:hover {
-  border-color: var(--line-strong);
-}
-
-/* Rows in a sortable table settle into their new order. */
-tbody tr {
-  transition: background 0.14s ease;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .nav-badge,
-  .empty {
-    animation: none;
-  }
-  button:active:not(:disabled),
-  .button:active {
-    transform: none;
-  }
-  .value {
-    transition: none;
-  }
-}
-
 /* A message the league posted itself — see SYSTEM_UID. It reads as the
    board's own voice rather than as a player, so it gets the crown, a
    tinted rail and no avatar. */
@@ -2053,3 +2086,44 @@ tbody tr {
 .chat-system-mark svg { width: 22px; height: 16px; }
 
 .chat-message.is-system .chat-author { color: var(--accent); }
+
+/* ── Less motion ───────────────────────────────────────────────────────
+   Everything above is decoration, so anyone who has asked for less of it
+   gets the finished state immediately — never a fade they have to wait
+   out, and never a block that is still invisible.
+
+   Last in the file on purpose: these are the rules that have to win, and
+   the version of this block that used to sit halfway up only did so
+   because every declaration in it carries !important. */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Pseudo-elements too: the landing page's drifting light is one, and a
+     duration cap that does not reach it would leave the only moving
+     thing on the page still moving. The delay has to go as well, or the
+     staggered hero arrives instantly but a third of a second late. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .reveal { opacity: 1 !important; transform: none !important; }
+
+  /* The endless ones stop outright rather than running invisibly fast. */
+  .home-sky::before,
+  .nav-badge,
+  .empty { animation: none !important; }
+
+  /* Nothing lifts, scales or presses. */
+  .player:hover .avatar-wrap,
+  .guide-card:hover,
+  .guide-chip:hover,
+  .home-figure:hover,
+  button:hover:not(:disabled),
+  .button:hover,
+  button:active:not(:disabled),
+  .button:active { transform: none !important; }
+}

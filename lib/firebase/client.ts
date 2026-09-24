@@ -2,7 +2,6 @@
 
 import { getApp, getApps, initializeApp, type FirebaseOptions } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
-import { ReCaptchaV3Provider, initializeAppCheck } from "firebase/app-check";
 import {
   getFirestore,
   initializeFirestore,
@@ -50,6 +49,13 @@ export function isFirebaseConfigured(): boolean {
  * console is what starts refusing requests without one. Do them in that
  * order, and watch the console's App Check metrics in between — turning
  * enforcement on first locks every real player out.
+ *
+ * Imported dynamically, and only when there is a key. firebase/app-check
+ * pulls in the reCAPTCHA v3 loader, and a static import put all of it in
+ * the first chunk every visitor downloads before anything is on screen —
+ * including deployments that have no key and will never call this.
+ * Nothing waits on the promise: App Check attaches itself to the app and
+ * the SDK picks the token up from there.
  */
 let appCheckStarted = false;
 
@@ -58,26 +64,28 @@ function startAppCheck(instance: ReturnType<typeof initializeApp>) {
   if (appCheckStarted || !siteKey || typeof window === "undefined") return;
   appCheckStarted = true;
 
-  try {
-    // A debug token lets a developer machine, which has no reCAPTCHA
-    // standing, register itself in the console and be allowed through.
-    // Never set in production: it is an explicit bypass.
-    const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
-    if (debugToken && process.env.NODE_ENV !== "production") {
-      (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
-        debugToken;
-    }
-
-    initializeAppCheck(instance, {
-      provider: new ReCaptchaV3Provider(siteKey),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } catch {
-    // A bad key, a blocked reCAPTCHA script, or a second initialisation.
-    // With enforcement off this costs nothing; with it on the request
-    // fails anyway, and failing here would take the whole page down
-    // instead of one request.
+  // A debug token lets a developer machine, which has no reCAPTCHA
+  // standing, register itself in the console and be allowed through.
+  // Never set in production: it is an explicit bypass.
+  const debugToken = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN;
+  if (debugToken && process.env.NODE_ENV !== "production") {
+    (self as unknown as { FIREBASE_APPCHECK_DEBUG_TOKEN?: string }).FIREBASE_APPCHECK_DEBUG_TOKEN =
+      debugToken;
   }
+
+  void import("firebase/app-check")
+    .then(({ ReCaptchaV3Provider, initializeAppCheck }) => {
+      initializeAppCheck(instance, {
+        provider: new ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    })
+    .catch(() => {
+      // A bad key, a blocked reCAPTCHA script, or a second
+      // initialisation. With enforcement off this costs nothing; with it
+      // on the request fails anyway, and failing here would take the
+      // whole page down instead of one request.
+    });
 }
 
 function app() {
