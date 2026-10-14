@@ -60,8 +60,8 @@ Your address is passed on the command line rather than stored in the repository.
 2. Add every variable from `.env.local` under **Settings → Environment Variables**. For
    `FIREBASE_PRIVATE_KEY`, paste the whole quoted string including the `\n` sequences.
 3. Deploy.
-4. `vercel.json` registers a daily cron at 06:00 UTC, which is within Hobby's limits. It announces
-   a month opening and sealing, and records that a run happened.
+4. `vercel.json` registers a daily cron at 06:00 UTC, which is within Hobby's limits. It records
+   the weekly price checkpoint, and records that a run happened.
 5. Go back to Firebase and add the deployed domain to **Authorized domains**.
 
 ## Running a month

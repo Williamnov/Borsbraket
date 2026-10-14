@@ -41,8 +41,7 @@ const manualProvider: PriceProvider = {
  * sixty seconds — so a feed that needs paced requests belongs in
  * scripts/fetch-prices.mjs, where the GitHub Action has as long as it
  * likes, and not here. `manual` stays the default for that reason: the
- * cron then only announces and records the run, both of which are
- * instant.
+ * cron then only records the run, which is instant.
  */
 const httpProvider: PriceProvider = {
   name: "http",

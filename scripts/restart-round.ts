@@ -171,12 +171,6 @@ async function main(): Promise<void> {
       endsOn: endsArg,
       status: "open",
       settledAt: null,
-      // Say it again. The open message only reaches the chat if the daily
-      // job runs before the new lock; after it, the route claims the flag
-      // silently rather than announcing an open month that is already
-      // sealed. The seal is announced either way.
-      announcedOpen: false,
-      announcedLock: false,
     },
     { merge: true },
   );

@@ -2162,27 +2162,17 @@ details.panel[open] > summary { background: var(--surface-sunk); }
 
 .byline { font-weight: 500; }
 
-/* A message the league posted itself — see SYSTEM_UID. It reads as the
-   board's own voice rather than as a player, so it gets the crown, a
-   tinted rail and no avatar. */
-.chat-message.is-system {
-  background: var(--accent-soft);
-  border-radius: var(--radius-sm);
-  padding: var(--s3);
-  margin: calc(var(--s2) * -1) calc(var(--s2) * -1) 0;
+/* Anywhere a player is named, the name leads to them. It has to look
+   like the text it replaced — a row of blue in a table reads as a list
+   of links rather than a scoreboard — so the colour only arrives on
+   hover, and the avatar already grows there. */
+.player-link,
+.player-link:hover {
+  color: inherit;
+  text-decoration: none;
 }
-
-.chat-system-mark {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  color: var(--accent);
-}
-.chat-system-mark svg { width: 22px; height: 16px; }
-
-.chat-message.is-system .chat-author { color: var(--accent); }
+.player-link:hover .name,
+.player-link:hover.chat-author { color: var(--accent); }
 
 /* ── Less motion ───────────────────────────────────────────────────────
    Everything above is decoration, so anyone who has asked for less of it

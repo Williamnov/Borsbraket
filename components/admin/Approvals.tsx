@@ -83,7 +83,7 @@ export function Approvals({
               }}
             >
               <div>
-                <PlayerCell profile={p} />
+                <PlayerCell profile={p} link={false} />
                 <span className="hint">{emailOf(p.uid) || "no address on file"}</span>
               </div>
               <span className="row">
@@ -125,7 +125,7 @@ export function Approvals({
                 {others.map((p) => (
                   <tr key={p.uid}>
                     <td>
-                      <PlayerCell profile={p} you={p.uid === meUid} />
+                      <PlayerCell profile={p} you={p.uid === meUid} link={false} />
                     </td>
                     <td className="hint">{emailOf(p.uid) || "—"}</td>
                     <td>

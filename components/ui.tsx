@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "@/components/AuthProvider";
@@ -57,17 +58,34 @@ export function Avatar({
   );
 }
 
+/**
+ * A player, wherever one is named: a picture, a name, and a way through
+ * to their page.
+ *
+ * Every row that shows a person is a link to them now. The affordance
+ * was already half there — the avatar has grown on hover since the
+ * motion pass — and a name beside a result is the one thing on these
+ * pages anybody wants to follow. `link={false}` is for the admin
+ * approvals list, where the name sits beside Approve and Reject and
+ * navigating away is the last thing you meant to do.
+ *
+ * A profile with no uid has no page to point at — a row for somebody
+ * the league no longer has — so it renders flat rather than as a link
+ * to /players/undefined.
+ */
 export function PlayerCell({
   profile,
   you,
   withMotto,
+  link = true,
 }: {
   profile: Profile | null | undefined;
   you?: boolean;
   withMotto?: boolean;
+  link?: boolean;
 }) {
-  return (
-    <div className="player">
+  const inside = (
+    <>
       <Avatar profile={profile} />
       <span style={{ minWidth: 0 }}>
         <span className="name">
@@ -78,7 +96,15 @@ export function PlayerCell({
           <span className="motto">{profileDescription(profile)}</span>
         ) : null}
       </span>
-    </div>
+    </>
+  );
+
+  if (!link || !profile?.uid) return <div className="player">{inside}</div>;
+
+  return (
+    <Link href={`/players/${profile.uid}`} className="player player-link">
+      {inside}
+    </Link>
   );
 }
 
